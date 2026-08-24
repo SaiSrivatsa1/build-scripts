@@ -79,14 +79,14 @@ jobs:
     steps:
       - name: Checkout code (Pull Request)
         if: github.event_name == 'pull_request'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Checkout code (Workflow Dispatch)
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: refs/pull/${{ inputs.pr_number }}/head
 
@@ -448,7 +448,7 @@ jobs:
       BUILD_SCRIPT: ${{ fromJson(needs.build_info.outputs.script_ubi8).script }}
       TESTED_ON:    ${{ fromJson(needs.build_info.outputs.script_ubi8).tested_on }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Download package-cache
@@ -462,9 +462,9 @@ jobs:
           # Capture the GHA job-level BUILD_SCRIPT before sourcing variable.sh,
           # which overwrites BUILD_SCRIPT with the first/backward-compat script.
           THIS_SCRIPT="$BUILD_SCRIPT"
+          sudo chown -R $USER:$USER .
           source package-cache/variable.sh
           source package-cache/scanner-env.sh
-          sudo chown -R $USER:$USER .
           echo "--- Executing changed scripts for UBI8 (script: $THIS_SCRIPT) ---"
           # Filter CHANGED_FILES to only the script assigned to this UBI job.
           export CHANGED_FILES=$(echo "$CHANGED_FILES" | grep -F "$THIS_SCRIPT" || true)
@@ -480,7 +480,7 @@ jobs:
       BUILD_SCRIPT: ${{ fromJson(needs.build_info.outputs.script_ubi9).script }}
       TESTED_ON:    ${{ fromJson(needs.build_info.outputs.script_ubi9).tested_on }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Download package-cache
@@ -492,9 +492,9 @@ jobs:
       - name: Build Package (UBI9)
         run: |
           THIS_SCRIPT="$BUILD_SCRIPT"
+          sudo chown -R $USER:$USER .
           source package-cache/variable.sh
           source package-cache/scanner-env.sh
-          sudo chown -R $USER:$USER .
           echo "--- Executing changed scripts for UBI9 (script: $THIS_SCRIPT) ---"
           export CHANGED_FILES=$(echo "$CHANGED_FILES" | grep -F "$THIS_SCRIPT" || true)
           export BUILD_SCRIPT="$THIS_SCRIPT"
@@ -509,7 +509,7 @@ jobs:
       BUILD_SCRIPT: ${{ fromJson(needs.build_info.outputs.script_ubi10).script }}
       TESTED_ON:    ${{ fromJson(needs.build_info.outputs.script_ubi10).tested_on }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Download package-cache
@@ -545,7 +545,7 @@ jobs:
       BUILD_SCRIPT: ${{ fromJson(needs.build_info.outputs.script_ubi8).script }}
       TESTED_ON:    ${{ fromJson(needs.build_info.outputs.script_ubi8).tested_on }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
@@ -588,7 +588,7 @@ jobs:
       BUILD_SCRIPT: ${{ fromJson(needs.build_info.outputs.script_ubi8).script }}
       TESTED_ON:    ${{ fromJson(needs.build_info.outputs.script_ubi8).tested_on }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
@@ -633,7 +633,7 @@ jobs:
       BUILD_SCRIPT: ${{ fromJson(needs.build_info.outputs.script_ubi9).script }}
       TESTED_ON:    ${{ fromJson(needs.build_info.outputs.script_ubi9).tested_on }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
@@ -676,7 +676,7 @@ jobs:
       BUILD_SCRIPT: ${{ fromJson(needs.build_info.outputs.script_ubi9).script }}
       TESTED_ON:    ${{ fromJson(needs.build_info.outputs.script_ubi9).tested_on }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
@@ -719,7 +719,7 @@ jobs:
       BUILD_SCRIPT: ${{ fromJson(needs.build_info.outputs.script_ubi9).script }}
       TESTED_ON:    ${{ fromJson(needs.build_info.outputs.script_ubi9).tested_on }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
@@ -763,7 +763,7 @@ jobs:
       BUILD_SCRIPT: ${{ fromJson(needs.build_info.outputs.script_ubi9).script }}
       TESTED_ON:    ${{ fromJson(needs.build_info.outputs.script_ubi9).tested_on }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
@@ -807,7 +807,7 @@ jobs:
       BUILD_SCRIPT: ${{ fromJson(needs.build_info.outputs.script_ubi9).script }}
       TESTED_ON:    ${{ fromJson(needs.build_info.outputs.script_ubi9).tested_on }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
@@ -852,7 +852,7 @@ jobs:
       BUILD_SCRIPT: ${{ fromJson(needs.build_info.outputs.script_ubi10).script }}
       TESTED_ON:    ${{ fromJson(needs.build_info.outputs.script_ubi10).tested_on }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
@@ -896,7 +896,7 @@ jobs:
       BUILD_SCRIPT: ${{ fromJson(needs.build_info.outputs.script_ubi10).script }}
       TESTED_ON:    ${{ fromJson(needs.build_info.outputs.script_ubi10).tested_on }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
@@ -940,7 +940,7 @@ jobs:
       BUILD_SCRIPT: ${{ fromJson(needs.build_info.outputs.script_ubi10).script }}
       TESTED_ON:    ${{ fromJson(needs.build_info.outputs.script_ubi10).tested_on }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
@@ -983,7 +983,7 @@ jobs:
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-24.04-s390x' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Download package-cache
