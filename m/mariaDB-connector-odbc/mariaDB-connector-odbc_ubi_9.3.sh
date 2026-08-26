@@ -4,7 +4,7 @@
 # Package        : MariaDB Connector ODBC
 # Version        : 3.2.6
 # Source repo    : https://github.com/mariadb-corporation/mariadb-connector-odbc
-# Tested on      : UBI: 9.3
+# Tested on      : UBI:9.3
 # Language       : c
 # Ci-Check   : True
 # Script License : Apache License, Version 2 or later
