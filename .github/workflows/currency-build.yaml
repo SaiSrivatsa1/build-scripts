@@ -134,6 +134,7 @@ jobs:
   # ---------------------------------------------------------------------------
   install_scan_tools:
     needs: build_info
+    if: ${{ inputs.wheel_build == 'true' || inputs.enable_grype == 'true' }}
     runs-on: ubuntu-24.04-s390x
     steps:
       - name: Checkout code
