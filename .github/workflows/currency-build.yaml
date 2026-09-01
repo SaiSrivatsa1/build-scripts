@@ -129,11 +129,12 @@ jobs:
           path: package-cache.tar.gz
 
   # ---------------------------------------------------------------------------
-  # install_scan_tools: installs grype + fetches scancode-toolkit source ONCE.
-  # Skipped entirely when wheel_build=false.
+  # Runs when wheel_build=true (scancode needed for wheels) OR enable_grype=true
+  # (grype needed for source/image scanners).
   # ---------------------------------------------------------------------------
   install_scan_tools:
     needs: build_info
+    if: ${{ inputs.wheel_build == 'true' || inputs.enable_grype == 'true' }}
     runs-on: ubuntu-24.04-s390x
     steps:
       - name: Checkout code
@@ -1358,7 +1359,7 @@ jobs:
   # Only runs when the corresponding build_ubiN succeeded and has a script.
   # ---------------------------------------------------------------------------
   source_scanner_ubi8:
-    needs: build_ubi8
+    needs: [build_ubi8, install_scan_tools]
     if: ${{ always() && inputs.validate_build_script == 'true' && needs.build_ubi8.result == 'success' }}
     runs-on: ubuntu-24.04-s390x
     steps:
@@ -1423,7 +1424,7 @@ jobs:
           bash ./gha-script/upload-scripts/upload_file.sh source_scanner_ubi8.tar.gz
 
   source_scanner_ubi9:
-    needs: build_ubi9
+    needs: [build_ubi9, install_scan_tools]
     if: ${{ always() && inputs.validate_build_script == 'true' && needs.build_ubi9.result == 'success' }}
     runs-on: ubuntu-24.04-s390x
     steps:
@@ -1488,7 +1489,7 @@ jobs:
           bash ./gha-script/upload-scripts/upload_file.sh source_scanner_ubi9.tar.gz
 
   source_scanner_ubi10:
-    needs: build_ubi10
+    needs: [build_ubi10, install_scan_tools]
     if: ${{ always() && inputs.validate_build_script == 'true' && needs.build_ubi10.result == 'success' }}
     runs-on: ubuntu-24.04-s390x
     steps:
