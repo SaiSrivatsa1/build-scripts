@@ -1,0 +1,159 @@
+name: Currency Build V2 Test
+on:
+  workflow_dispatch:
+    inputs:
+      package_json:
+        description: >
+          Package data as a JSON object. Example:
+          {"package_name":"brotlipy","package_version":"v0.8.0","technology":"python","technology_version":"3.12","ubi_version":""}
+        required: true
+        type: string
+      validate_build_script_v2:
+        description: 'Run v2 build script via powercore'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      wheel_build:
+        description: 'Create wheel for all Python versions via powercore'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      build_docker:
+        description: 'Build docker image'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      powercore_version:
+        description: 'Version of powercore wheels to download from COS (e.g. 1.2.3)'
+        required: true
+        type: string
+run-name: Currency Build V2 for ${{ inputs.package_name }} && Unique ID ${{ inputs.unique_id }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # build_info: Parses the package_json input, validates required fields, and
+  # writes variable.sh — uploaded as an artifact for all downstream jobs.
+  # ---------------------------------------------------------------------------
+  build_info:
+    runs-on: ubuntu-24.04-s390x
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt update -y && sudo apt install -y jq
+
+      - name: Parse package_json and write variable.sh
+        run: |
+          chmod +x ./gha-script/parse-package-json.sh
+          bash ./gha-script/parse-package-json.sh \
+            '${{ inputs.package_json }}' \
+            '${{ inputs.validate_build_script_v2 }}' \
+            '${{ inputs.wheel_build }}' \
+            '${{ inputs.build_docker }}' \
+            '${{ inputs.powercore_version }}'
+
+      - name: Upload variable.sh as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-info
+          path: variable.sh
+
+  # ---------------------------------------------------------------------------
+  # build_v2: Downloads build-info artifact, sources variable.sh, downloads
+  # PowerCore wheels from COS, installs PowerCore, drops a CSV into the
+  # preprocess inbox, and polls until the pipeline completes or fails.
+  # ---------------------------------------------------------------------------
+  build_v2:
+    needs: build_info
+    if: ${{ inputs.validate_build_script_v2 == 'true' || inputs.wheel_build == 'true' || inputs.build_docker == 'true' }}
+    runs-on: ${{ inputs.large-runner-label != '' && inputs.large-runner-label || 'ubuntu-24.04-s390x' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build-info artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-info
+
+      - name: Load variable.sh into job environment
+        run: |
+          echo "===== variable.sh ====="
+          cat variable.sh
+          echo "======================="
+          while IFS='=' read -r key value; do
+            key="${key// /}"
+            [[ -z "$key" || "$key" == \#* ]] && continue
+            value="${value%\"}"
+            value="${value#\"}"
+            echo "${key}=${value}" >> "$GITHUB_ENV"
+          done < variable.sh
+
+      - name: Install system dependencies
+        run: sudo apt update -y && sudo apt install -y wget curl tar jq git
+
+      - name: Download PowerCore wheels from COS
+        env:
+          GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
+        run: |
+          chmod +x ./gha-script/download-wheels.sh
+          bash ./gha-script/download-wheels.sh \
+            "$GHA_CURRENCY_SERVICE_ID_API_KEY" \
+            "$POWERCORE_VERSION"
+
+      - name: Install PowerCore wheels
+        run: |
+          chmod +x ./gha-script/install-powercore.sh
+          bash ./gha-script/install-powercore.sh "$(pwd)/powercore-config.env"
+
+      - name: Install IBM Cloud CLI
+        run: |
+          echo "--- Installing IBM Cloud CLI ---"
+          curl -fsSL https://clis.cloud.ibm.com/install/linux | sudo sh
+          ibmcloud version
+          echo "--- Installing plugins ---"
+          ibmcloud plugin install cloud-object-storage -f
+          ibmcloud plugin install container-registry -f
+          ibmcloud plugin list
+
+      - name: Create PowerCore queue directories
+        run: |
+          chmod +x ./gha-script/setup-queues.sh
+          bash ./gha-script/setup-queues.sh
+
+      - name: Start PowerCore workers
+        run: |
+          chmod +x ./gha-script/start-workers.sh
+          bash ./gha-script/start-workers.sh
+
+      - name: Drop CSV into PowerCore inbox
+        id: drop_csv
+        run: |
+          chmod +x ./gha-script/drop-csv.sh
+          bash ./gha-script/drop-csv.sh \
+            "$POWERCORE_RUNTIME" \
+            "${{ github.run_id }}" \
+            "$PACKAGE_NAME" \
+            "$PACKAGE_VERSION" \
+            "$TECHNOLOGY" \
+            "$TECHNOLOGY_VERSION" \
+            "$UBI_VERSION"
+
+      - name: Wait for PowerCore pipeline to complete
+        timeout-minutes: 180
+        run: |
+          chmod +x ./gha-script/poll-pipeline.sh
+          bash ./gha-script/poll-pipeline.sh \
+            "${{ steps.drop_csv.outputs.powercore_runtime }}" \
+            "${{ steps.drop_csv.outputs.csv_name }}" \
+            "$PACKAGE_NAME"
