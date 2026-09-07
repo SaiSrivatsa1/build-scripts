@@ -32,7 +32,9 @@ PREV_STAGE=""
 POWERCORE_UID=$(id -u powercore 2>/dev/null || echo "")
 XDG_DIR="/run/user/${POWERCORE_UID}"
 DBUS="unix:path=/run/user/${POWERCORE_UID}/bus"
-WFLOG="${POWERCORE_RUNTIME}/logs/workflow.log"
+# Deep scan writes to deep-scan.log via LOGGING config in config.py.
+# Fall back to any *.log under logs/ if that specific file is absent.
+WFLOG="${POWERCORE_RUNTIME}/logs/deep-scan.log"
 
 # ── _find_brequest ─────────────────────────────────────────────────────────────
 # Returns the BRequest path relative to POWERCORE_RUNTIME.
@@ -112,26 +114,45 @@ _json_field() {
     || true
 }
 
+# ── _json_nested_field ─────────────────────────────────────────────────────────
+# Extract a value from a nested JSON object: finds the first occurrence of "key"
+# at any depth. Used for shallow_scan_metadata.json whose stats live under
+# {"statistics": {"satisfied": N, ...}}.
+# Usage: _json_nested_field <file> <key>
+_json_nested_field() {
+  sudo -u powercore grep -o "\"$2\"[[:space:]]*:[[:space:]]*[^,}\n]*" "$1" \
+    2>/dev/null | head -1 \
+    | awk -F': ' '{gsub(/[",[:space:]]/,"",$2); print $2}' \
+    || true
+}
+
 # ── _print_shallow_summary ─────────────────────────────────────────────────────
 # Reads shallow_scan_metadata.json (written by shallow_scan.py:write_shallow_scan_metadata).
-# File lives at: BRequest_dir/sheet_*/shallow_scan_output/shallow_scan_metadata.json
+# Structure: top-level keys (duration_seconds, next_stage) + nested "statistics"
+# object (satisfied, rebuild, pass_to_deep_scan, …).
+# Searched under POWERCORE_RUNTIME — safe to call at any point regardless of
+# which queue stage the BRequest is currently in.
 _print_shallow_summary() {
   local meta
-  meta=$(sudo -u powercore find "$1" \
+  meta=$(sudo -u powercore find "${POWERCORE_RUNTIME}" \
     -name "shallow_scan_metadata.json" 2>/dev/null | head -1)
-  [ -z "$meta" ] && return
+  if [ -z "$meta" ]; then
+    echo "  (no shallow_scan_metadata.json found)"
+    return
+  fi
   local satisfied failed_known noarch rebuild new_pkg lang_unavail
-  local pass_deep reduction dur next_st
-  satisfied=$(_json_field   "${meta}" "satisfied")
-  failed_known=$(_json_field "${meta}" "failed_known")
-  noarch=$(_json_field       "${meta}" "noarch_unverified")
-  rebuild=$(_json_field      "${meta}" "rebuild")
-  new_pkg=$(_json_field      "${meta}" "new")
-  lang_unavail=$(_json_field "${meta}" "lang_ver_unavailable")
-  pass_deep=$(_json_field    "${meta}" "pass_to_deep_scan")
-  reduction=$(_json_field    "${meta}" "reduction_pct")
-  dur=$(_json_field          "${meta}" "duration_seconds")
-  next_st=$(_json_field      "${meta}" "next_stage")
+  local pass_deep dur next_st
+  # stats live inside the "statistics" nested object — use _json_nested_field
+  satisfied=$(_json_nested_field  "${meta}" "satisfied")
+  failed_known=$(_json_nested_field "${meta}" "failed_known")
+  noarch=$(_json_nested_field      "${meta}" "noarch_unverified")
+  rebuild=$(_json_nested_field     "${meta}" "rebuild")
+  new_pkg=$(_json_nested_field     "${meta}" "new")
+  lang_unavail=$(_json_nested_field "${meta}" "lang_ver_unavailable")
+  pass_deep=$(_json_nested_field   "${meta}" "pass_to_deep_scan")
+  # top-level keys
+  dur=$(_json_field                "${meta}" "duration_seconds")
+  next_st=$(_json_field            "${meta}" "next_stage")
   local total=$(( ${satisfied:-0} + ${failed_known:-0} + ${noarch:-0} \
                   + ${rebuild:-0} + ${new_pkg:-0} + ${lang_unavail:-0} ))
   echo "  Shallow Scan Summary"
@@ -144,35 +165,102 @@ _print_shallow_summary() {
   echo "  NEW                : ${new_pkg:-0}"
   echo "  LANG_VER_UNAVAIL   : ${lang_unavail:-0}"
   echo "  Pass to Deep Scan  : ${pass_deep:-0}"
-  echo "  Reduction          : ${reduction:-0}%"
   echo "  Duration           : ${dur:-0}s"
   echo "  ----------------------------------------"
   echo "  Next stage         : ${next_st:-unknown}"
 }
 
+# ── _print_image_pull_info ─────────────────────────────────────────────────────
+# Extracts image availability check lines from the deep scan log so users and
+# devs can see exactly which container images were used for the build.
+# Looks for lines written by docker_manager.ensure_images_available():
+#   "Image availability check"
+#   "✓ <image> — already present"
+#   "↓ Pulling <image> ..."
+#   "✓ Pulled <image>"
+#   "✗ Image not found ..."
+#   "All required images are available"
+_print_image_pull_info() {
+  local logfile="${WFLOG}"
+  # Resolve log file same way _print_deep_scan_summary does
+  if [ ! -f "${logfile}" ]; then
+    logfile=$(sudo -u powercore find "${POWERCORE_RUNTIME}/logs" \
+      -name "*.log" 2>/dev/null | head -1)
+  fi
+  [ -z "${logfile}" ] && return
+
+  local image_lines
+  image_lines=$(sudo -u powercore grep -a \
+    -e "Image availability check" \
+    -e "image(s) required" \
+    -e "already present" \
+    -e "Pulling " \
+    -e "Pulled " \
+    -e "Re-tagging" \
+    -e "Image not found" \
+    -e "Pull attempt" \
+    -e "All required images" \
+    -e "ICR credentials written" \
+    -e "ICR credentials removed" \
+    "${logfile}" 2>/dev/null || true)
+
+  if [ -z "${image_lines}" ]; then
+    echo "  (no image pull info found in ${logfile})"
+    return
+  fi
+  echo "${image_lines}" | sed 's/^/  /'
+}
+
+# ── _dump_deep_scan_journal ────────────────────────────────────────────────────
+# Prints the complete deep scan worker journal — all lines, no limit.
+_dump_deep_scan_journal() {
+  echo "  ── Deep Scan worker journal (full) ──────────────────────────"
+  sudo -u powercore \
+    XDG_RUNTIME_DIR="${XDG_DIR}" DBUS_SESSION_BUS_ADDRESS="${DBUS}" \
+    journalctl --user -u "powercore-worker@05-deep-scan.service" \
+      --no-pager 2>/dev/null || true
+}
+
 # ── _print_deep_scan_summary ───────────────────────────────────────────────────
-# progress_reporter.py writes: "■ DONE  N/T ✓  F ✗  elapsed=Xm Ys  success=Z%"
-# Fallback: run_core._print_summary() individual lines.
+# Deep Scan writes summaries to deep-scan.log (config.py LOGGING["file"]).
+# Fallback: any *.log in the logs/ directory.
 _print_deep_scan_summary() {
-  [ ! -f "${WFLOG}" ] && return
+  if [ ! -f "${WFLOG}" ]; then
+    # deep-scan.log may not exist yet for very fast runs or if the log path
+    # differs inside the worker.  Search for any *.log under the logs dir.
+    local alt
+    alt=$(sudo -u powercore find "${POWERCORE_RUNTIME}/logs" \
+      -name "*.log" 2>/dev/null | head -1)
+    if [ -z "$alt" ]; then
+      echo "  (no log files found under ${POWERCORE_RUNTIME}/logs)"
+      return
+    fi
+    echo "  NOTE: ${WFLOG} not found — using ${alt}"
+    WFLOG="$alt"
+  fi
+  echo "  Log file: ${WFLOG}"
   local done_line
-  done_line=$(sudo -u powercore grep -a "DONE" "${WFLOG}" 2>/dev/null \
-    | grep -a "elapsed=" | tail -1 || true)
+  done_line=$(sudo -u powercore grep -a "elapsed=" "${WFLOG}" 2>/dev/null \
+    | tail -1 || true)
   if [ -n "$done_line" ]; then
-    echo "  Deep Scan Summary"
+    echo "  Deep Scan log line:"
     echo "  ----------------------------------------"
     echo "  ${done_line}"
     echo "  ----------------------------------------"
   else
+    # Log lines look like:
+    #   2026-09-03 07:11:34,752 - module - INFO - Total packages: 1
+    # Extract the number that follows the last ": " on the line.
     local total success failed rate
     total=$(sudo -u powercore grep -a "Total packages:" "${WFLOG}" 2>/dev/null \
-      | tail -1 | grep -oP '\d+' || true)
-    success=$(sudo -u powercore grep -a "Successful:" "${WFLOG}" 2>/dev/null \
-      | tail -1 | grep -oP '\d+' || true)
-    failed=$(sudo -u powercore grep -aP "Failed: \d" "${WFLOG}" 2>/dev/null \
-      | tail -1 | grep -oP '\d+$' || true)
+      | tail -1 | sed 's/.*Total packages: *//' | grep -oP '^\d+' || true)
+    success=$(sudo -u powercore grep -a " Successful:" "${WFLOG}" 2>/dev/null \
+      | tail -1 | sed 's/.*Successful: *//' | grep -oP '^\d+' || true)
+    failed=$(sudo -u powercore grep -a " Failed:" "${WFLOG}" 2>/dev/null \
+      | grep -v "Failed packages" | tail -1 \
+      | sed 's/.*Failed: *//' | grep -oP '^\d+' || true)
     rate=$(sudo -u powercore grep -a "Success rate:" "${WFLOG}" 2>/dev/null \
-      | tail -1 | grep -oP '[\d.]+%' || true)
+      | tail -1 | sed 's/.*Success rate: *//' | grep -oP '^[\d.]+%' || true)
     if [ -n "$total" ]; then
       echo "  Deep Scan Summary"
       echo "  ----------------------------------------"
@@ -183,6 +271,178 @@ _print_deep_scan_summary() {
       echo "  ----------------------------------------"
     fi
   fi
+}
+
+# ── _print_deep_scan_results ───────────────────────────────────────────────────
+# Reads validation_summary.json files written by result_parser.py per package.
+# Path: BRequest_dir/sheet_*/lang/pkg/output[/suffix]/validation_summary.json
+# JSON keys: package_name, package_version, status, execution_time_seconds
+#
+# Searched across all of POWERCORE_RUNTIME so they are found regardless of which
+# queue subdir the BRequest is currently in.  Bookkeeping deletes them on
+# finalisation, so this must be called before the SUCCESS block.
+#
+# Fallback: output/results_summary.json (survives bookkeeping, written by post-process)
+_print_deep_scan_results() {
+  local found_any=false
+  while IFS= read -r vsf; do
+    found_any=true
+    local pkg ver status exec_time
+    pkg=$(_json_field       "${vsf}" "package_name")
+    ver=$(_json_field       "${vsf}" "package_version")
+    status=$(_json_field    "${vsf}" "status")
+    exec_time=$(_json_field "${vsf}" "execution_time_seconds")
+    printf "  [%-14s]  %-28s  %-10s  %ss\n" \
+      "${status:-?}" "${pkg:-?}" "${ver:-?}" "${exec_time:-?}"
+  done < <(sudo -u powercore find "${POWERCORE_RUNTIME}" \
+    -name "validation_summary.json" 2>/dev/null)
+  if [ "$found_any" = "false" ]; then
+    # validation_summary.json deleted by bookkeeping — fall back to
+    # results_summary.csv in output/ which survives the cleanup.
+    # If deep scan produced no Docker results at all, also dump the journal.
+    _print_results_summary_fallback
+  fi
+}
+
+# ── _print_failure_logs ────────────────────────────────────────────────────────
+# For every failed/errored package in the BRequest, print the Docker build log
+# so developers can pinpoint the failure without digging into artifacts.
+#
+# Looks for logs in priority order:
+#   1. output/artifacts/logs/docker_package.log.gz  (gzipped, post-bookkeeping)
+#   2. output/artifacts/logs/docker_package.log     (plain, during processing)
+#   3. output/logs/*.log                             (any log in output/logs/)
+#   4. Deep scan worker journal (last resort)
+_print_failure_logs() {
+  local result_dir="$1"
+  local found_failure=false
+
+  # Find all packages with a non-success status in results_summary.csv
+  local csv
+  csv=$(sudo -u powercore find "${result_dir}" \
+    -name "results_summary.csv" 2>/dev/null | head -1)
+
+  # Collect failed package names from CSV (status != BUILD_SUCCESS)
+  local failed_pkgs=""
+  if [ -n "${csv}" ]; then
+    failed_pkgs=$(sudo -u powercore awk -F',' '
+      NR==1 {
+        for (i=1;i<=NF;i++) {
+          gsub(/\r/,"",$i); gsub(/^ +| +$/,"",$i)
+          if ($i=="package_name"||$i=="name") ni=i
+          if ($i=="status") si=i
+        }
+        next
+      }
+      NF>1 {
+        gsub(/\r/,"")
+        s=(si?$si:""); n=(ni?$ni:"?")
+        if (s != "BUILD_SUCCESS" && s != "SATISFIED") print n
+      }
+    ' "${csv}" 2>/dev/null || true)
+  fi
+
+  if [ -z "${failed_pkgs}" ]; then
+    # No CSV or all succeeded — nothing to dump
+    return
+  fi
+
+  echo ""
+  echo "  ════════════════════════════════════════════════════════════"
+  echo "  Build Failure Logs"
+  echo "  ════════════════════════════════════════════════════════════"
+
+  while IFS= read -r pkg; do
+    [ -z "${pkg}" ] && continue
+    found_failure=true
+    echo ""
+    echo "  ── Package: ${pkg} ──────────────────────────────────────────"
+
+    # Search for docker build logs for this package
+    local log_gz log_plain log_dir
+    log_gz=$(sudo -u powercore find "${result_dir}" \
+      -path "*/${pkg}*/docker_package.log.gz" 2>/dev/null | head -1)
+    log_plain=$(sudo -u powercore find "${result_dir}" \
+      -path "*/${pkg}*/docker_package.log" 2>/dev/null | head -1)
+    log_dir=$(sudo -u powercore find "${result_dir}" \
+      -path "*/${pkg}*/logs" -type d 2>/dev/null | head -1)
+
+    if [ -n "${log_gz}" ]; then
+      echo "  Log: ${log_gz##*/result_dir/} (gzipped)"
+      echo "  ----------------------------------------"
+      sudo -u powercore zcat "${log_gz}" 2>/dev/null \
+        | tail -100 | sed 's/^/  /' || true
+    elif [ -n "${log_plain}" ]; then
+      echo "  Log: ${log_plain##*/result_dir/}"
+      echo "  ----------------------------------------"
+      sudo -u powercore tail -100 "${log_plain}" 2>/dev/null \
+        | sed 's/^/  /' || true
+    elif [ -n "${log_dir}" ]; then
+      echo "  Logs dir: ${log_dir}"
+      echo "  ----------------------------------------"
+      sudo -u powercore find "${log_dir}" -type f 2>/dev/null \
+        | sort | while IFS= read -r lf; do
+          echo "  --- $(basename "${lf}") ---"
+          if echo "${lf}" | grep -q '\.gz$'; then
+            sudo -u powercore zcat "${lf}" 2>/dev/null | tail -50 | sed 's/^/  /' || true
+          else
+            sudo -u powercore tail -50 "${lf}" 2>/dev/null | sed 's/^/  /' || true
+          fi
+        done
+    else
+      echo "  (no docker build log found for ${pkg})"
+      echo "  Searching BRequest tree for any logs..."
+      sudo -u powercore find "${result_dir}" \
+        -path "*/${pkg}*" -name "*.log*" 2>/dev/null \
+        | head -10 | sed 's/^/    /' || true
+    fi
+  done <<< "${failed_pkgs}"
+
+  if [ "${found_failure}" = "true" ]; then
+    echo ""
+    echo "  ── Deep Scan worker journal (last 50 lines) ─────────────────"
+    _worker_journal "05-deep-scan" 50
+  fi
+  echo "  ════════════════════════════════════════════════════════════"
+}
+
+# ── _print_results_summary_fallback ───────────────────────────────────────────
+# Reads results_summary.csv written by post-process (survives bookkeeping).
+# Searched across POWERCORE_RUNTIME so it works whether BRequest is still in
+# queues/ or has already moved to requests/.
+_print_results_summary_fallback() {
+  local csv
+  csv=$(sudo -u powercore find "${POWERCORE_RUNTIME}" \
+    -name "results_summary.csv" -path "*/${BREQUEST}/*" 2>/dev/null | head -1)
+  if [ -z "$csv" ]; then
+    # No results at all — dump the deep scan journal to show why Docker didn't run
+    echo "  (no package results found)"
+    echo ""
+    echo "  BRequest directory tree:"
+    sudo -u powercore find "${POWERCORE_RUNTIME}" \
+      -path "*/${BREQUEST}/*" -not -path "*/\.*" 2>/dev/null \
+      | sort | head -40 | sed "s|.*/${BREQUEST}/||" | sed 's/^/    /'
+    echo ""
+    echo "  Deep Scan worker journal (last 50 lines):"
+    echo "  ----------------------------------------"
+    _worker_journal "05-deep-scan" 50
+    return
+  fi
+  sudo -u powercore awk -F',' '
+    NR==1 {
+      for (i=1;i<=NF;i++) {
+        gsub(/\r/,"",$i); gsub(/^ +| +$/,"",$i)
+        if ($i=="package_name" || $i=="name")   ni=i
+        if ($i=="package_version"||$i=="version") vi=i
+        if ($i=="status")                       si=i
+      }
+      next
+    }
+    NF>1 {
+      gsub(/\r/,"")
+      printf "  [%-14s]  %-28s  %s\n", (si?$si:"?"), (ni?$ni:"?"), (vi?$vi:"?")
+    }
+  ' "${csv}" 2>/dev/null || true
 }
 
 # ── _print_postprocess_summary ─────────────────────────────────────────────────
@@ -262,7 +522,20 @@ echo "  Package      : ${PKG_NAME}"
 echo "  CSV file     : ${CSV_NAME}"
 echo "  Runtime      : ${POWERCORE_RUNTIME}"
 echo "  Poll interval: ${POLL_INTERVAL}s  |  Soft timeout: $((TIMEOUT_SECS/60))min"
+echo "  Deep scan log: ${WFLOG}"
 echo "============================================================"
+
+echo "--- Runtime directory state at startup ---"
+sudo -u powercore find "${POWERCORE_RUNTIME}" -maxdepth 3 -type d 2>/dev/null | sort | head -30 \
+  || echo "  (could not list runtime tree)"
+echo ""
+
+echo "--- Worker status at startup ---"
+for _s in 03-preprocess 04-shallow-scan 05-deep-scan 06-post-process 07-bookkeeping; do
+  _st=$(sudo -u powercore XDG_RUNTIME_DIR="${XDG_DIR}" DBUS_SESSION_BUS_ADDRESS="${DBUS}" \
+    systemctl --user is-active "powercore-worker@${_s}.service" 2>/dev/null || true)
+  echo "  powercore-worker@${_s}: ${_st}"
+done
 echo ""
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -345,6 +618,16 @@ while true; do
   if [ "${ELAPSED}" -ge "${TIMEOUT_SECS}" ]; then
     echo ""
     echo "TIMEOUT (${ELAPSED}s) — pipeline did not complete in time"
+    echo ""
+    echo "--- Runtime snapshot at timeout ---"
+    echo "  BRequest: ${BREQUEST}"
+    echo "  Current location: $(_find_brequest || echo 'not found')"
+    echo ""
+    echo "  BRequest files:"
+    sudo -u powercore find "${POWERCORE_RUNTIME}" \
+      -path "*/${BREQUEST}/*" -not -path "*/\.*" 2>/dev/null \
+      | sort | head -40 | sed 's/^/    /' || true
+    echo ""
     _dump_all_journals
     exit 1
   fi
@@ -364,14 +647,32 @@ while true; do
     echo ""
     _print_postprocess_summary "${RESULT_DIR}"
     echo ""
-    SHALLOW_CSV=$(sudo -u powercore find "${RESULT_DIR}" \
-      -maxdepth 1 -name "*shallow_results.csv" 2>/dev/null | head -1)
-    if [ -n "$SHALLOW_CSV" ]; then
-      echo "  Shallow Scan — Per-Package Status"
-      echo "  ----------------------------------------"
-      _print_shallow_csv "${SHALLOW_CSV}"
-      echo ""
-    fi
+    echo "  Deep Scan — Container Images Used"
+    echo "  ----------------------------------------"
+    _print_image_pull_info
+    echo ""
+    echo "  Deep Scan — Per-Package Results"
+    echo "  ----------------------------------------"
+    _print_deep_scan_results
+    # Surface build logs for any failed packages
+    _print_failure_logs "${RESULT_DIR}"
+    echo ""
+    echo "  ════════════════════════════════════════════════════════════"
+    echo "  Post-Process Worker Journal"
+    echo "  ════════════════════════════════════════════════════════════"
+    sudo -u powercore \
+      XDG_RUNTIME_DIR="${XDG_DIR}" DBUS_SESSION_BUS_ADDRESS="${DBUS}" \
+      journalctl --user -u "powercore-worker@06-post-process.service" \
+        --no-pager 2>/dev/null || true
+    echo ""
+    echo "  ════════════════════════════════════════════════════════════"
+    echo "  Bookkeeping Worker Journal"
+    echo "  ════════════════════════════════════════════════════════════"
+    sudo -u powercore \
+      XDG_RUNTIME_DIR="${XDG_DIR}" DBUS_SESSION_BUS_ADDRESS="${DBUS}" \
+      journalctl --user -u "powercore-worker@07-bookkeeping.service" \
+        --no-pager 2>/dev/null || true
+    echo ""
     OUTPUT_DIR="${RESULT_DIR}/output"
     if sudo -u powercore test -d "${OUTPUT_DIR}" 2>/dev/null; then
       echo "  Output Files"
@@ -409,31 +710,55 @@ while true; do
   # ── TRANSITION ───────────────────────────────────────────────────────────────
   if [ "${CUR_LOCATION}" != "${PREV_LOCATION}" ]; then
     CUR_STAGE=$(echo "$CUR_LOCATION" | grep -oP '\d\d-[a-z-]+' | head -1)
-    CUR_SUB=$(echo "$CUR_LOCATION"   | grep -oP '(?<=/)(inbox|processing|outbox)(?=/)' | head -1)
     ELAPSED_MIN=$(( ELAPSED / 60 ))
     ELAPSED_SEC=$(( ELAPSED % 60 ))
 
     if [ "${CUR_STAGE}" != "${PREV_STAGE}" ] && [ -n "${CUR_STAGE}" ]; then
-      _section_header "${CUR_STAGE}" "${ELAPSED_MIN}" "${ELAPSED_SEC}"
+      # ── Stage-exit summaries: printed under the CLOSING stage's header ───
+      # Strategy: open the new section header, then immediately print a closing
+      # summary for the stage that just ended.  This means:
+      #   - Stage N header  (section_header)
+      #   - [Xm Ys]  Stage N  [running/queued]  (location line)
+      #   ...heartbeats...
+      #   - "Stage N — Done" summary block   ← fired here on exit
+      #   - Stage N+1 header  (next iteration)
+      #
+      # Data availability:
+      #  • shallow_scan_metadata.json: present at BRequest inbox of 05-deep-scan
+      #    when poller first detects the Stage 3 transition — safe to read
+      #  • validation_summary.json: present during 05-deep-scan/processing;
+      #    searched POWERCORE_RUNTIME-wide so found even at 06-post-process inbox
+      #  • Both deleted by bookkeeping — this block fires before SUCCESS check
 
+      # Print exit summary for the stage that just finished
       case "${PREV_STAGE}" in
         04-shallow-scan)
-          BREQ_SEARCH=$(sudo -u powercore find \
-            "${POWERCORE_RUNTIME}/queues/${PREV_STAGE}" \
-            -name "shallow_scan_metadata.json" 2>/dev/null | head -1)
-          if [ -n "$BREQ_SEARCH" ]; then
-            _print_shallow_summary "$(dirname "$BREQ_SEARCH")"
-          else
-            _print_shallow_summary \
-              "${POWERCORE_RUNTIME}/queues/${CUR_STAGE}/${CUR_SUB:-inbox}/${BREQUEST}"
-          fi
+          echo "  Shallow Scan — Result"
+          echo "  ----------------------------------------"
+          _print_shallow_summary
           echo ""
           ;;
         05-deep-scan)
           _print_deep_scan_summary
           echo ""
+          echo "  Deep Scan — Per-Package Results"
+          echo "  ----------------------------------------"
+          _print_deep_scan_results
+          echo ""
           ;;
       esac
+
+      _section_header "${CUR_STAGE}" "${ELAPSED_MIN}" "${ELAPSED_SEC}"
+
+      # Special case: if PREV_STAGE="" the poller never saw Stage 2 individually
+      # (preprocess handed off synchronously before the first poll hit Stage 2).
+      # Shallow scan is already done — print its summary under Stage 3 header.
+      if [ -z "${PREV_STAGE}" ] && [ "${CUR_STAGE}" = "05-deep-scan" ]; then
+        echo "  Shallow Scan — Result (completed before first poll)"
+        echo "  ----------------------------------------"
+        _print_shallow_summary
+        echo ""
+      fi
 
       PREV_STAGE="${CUR_STAGE}"
     fi
