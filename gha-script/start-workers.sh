@@ -18,9 +18,8 @@ XDG_DIR="/run/user/${POWERCORE_UID}"
 DBUS="unix:path=/run/user/${POWERCORE_UID}/bus"
 PC_HOME=$(getent passwd powercore | cut -d: -f6)
 
-echo "--- powercore UID: ${POWERCORE_UID} ---"
-echo "--- XDG_RUNTIME_DIR: ${XDG_DIR} ---"
-echo "--- PC_HOME: ${PC_HOME} ---"
+# Sensitive information redacted for security
+echo "--- Initializing powercore worker startup ---"
 
 # ── Resolve POWERCORE_RUNTIME from installed systemd.env ─────────────────────
 SYSTEMD_ENV=""
@@ -30,7 +29,7 @@ for candidate in \
   "${PC_HOME}/.local/share/powercore/runtime/config/systemd.env"; do
   if sudo -u powercore test -f "${candidate}" 2>/dev/null; then
     SYSTEMD_ENV="${candidate}"
-    echo "--- Found systemd.env: ${SYSTEMD_ENV} ---"
+    echo "--- Found systemd.env configuration ---"
     break
   fi
 done
@@ -40,7 +39,7 @@ if [ -z "${SYSTEMD_ENV}" ]; then
   SYSTEMD_ENV=$(sudo -u powercore find "${PC_HOME}" \
     -maxdepth 6 -name "systemd.env" -path "*/runtime/config/systemd.env" \
     2>/dev/null | head -1)
-  [ -n "${SYSTEMD_ENV}" ] && echo "--- Found via search: ${SYSTEMD_ENV} ---"
+  [ -n "${SYSTEMD_ENV}" ] && echo "--- Found systemd.env via filesystem search ---"
 fi
 
 if [ -z "${SYSTEMD_ENV}" ]; then
@@ -58,7 +57,7 @@ if [ -z "${POWERCORE_RUNTIME}" ]; then
   CONFIG_DIR=$(dirname "${SYSTEMD_ENV}")
   POWERCORE_RUNTIME=$(dirname "${CONFIG_DIR}")
 fi
-echo "--- POWERCORE_RUNTIME: ${POWERCORE_RUNTIME} ---"
+echo "--- POWERCORE_RUNTIME configured ---"
 
 # Helper: run a systemctl command as the powercore user
 _sctl() {
