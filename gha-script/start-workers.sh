@@ -68,13 +68,30 @@ _sctl() {
     systemctl --user "$@"
 }
 
-echo "--- Starting powercore-workflow.target ---"
-_sctl start powercore-workflow.target || true
+# ── Check if all workers are already active ──────────────────────────────────
+echo "--- Checking current worker status ---"
+ALL_ALREADY_ACTIVE=true
+for stage in 03-preprocess 04-shallow-scan 05-deep-scan 06-post-process 07-bookkeeping; do
+  STATUS=$(_sctl is-active "powercore-worker@${stage}.service" 2>/dev/null || echo "inactive")
+  echo "  powercore-worker@${stage}: ${STATUS}"
+  if [ "$STATUS" != "active" ]; then
+    ALL_ALREADY_ACTIVE=false
+  fi
+done
 
-echo "--- Waiting 30s for workers to initialise ---"
-sleep 30
+# Only start/reload if services are not all active
+if [ "$ALL_ALREADY_ACTIVE" = "true" ]; then
+  echo "--- All PowerCore workers already active, no action needed ---"
+else
+  echo "--- Some workers are down, starting powercore-workflow.target ---"
+  _sctl start powercore-workflow.target || true
+  
+  echo "--- Waiting 30s for workers to initialise ---"
+  sleep 30
+fi
 
-echo "--- Per-worker unit status ---"
+# ── Verify all workers are active ─────────────────────────────────────────────
+echo "--- Final worker status verification ---"
 ALL_ACTIVE=true
 for stage in 03-preprocess 04-shallow-scan 05-deep-scan 06-post-process 07-bookkeeping; do
   STATUS=$(_sctl is-active "powercore-worker@${stage}.service" 2>/dev/null || true)
