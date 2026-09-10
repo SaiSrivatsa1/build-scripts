@@ -37,11 +37,8 @@ on:
         required: true
         type: string
 
-run-name: >
-  ${{ inputs.large-runner-label != '' &&
-      format('Retriggered Currency Build V2 for {0} on {1}', fromJson(inputs.package_json).package_name, inputs.large-runner-label) ||
-      format('Currency Build V2 — {0} {1}', fromJson(inputs.package_json).package_name, fromJson(inputs.package_json).package_version)
-  }}
+run-name: ${{ format('Currency Build V2 — {0} {1}', fromJson(inputs.package_json).package_name, fromJson(inputs.package_json).package_version) }}
+
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -59,8 +56,8 @@ jobs:
 
       - name: Parse package_json and write variable.sh
         run: |
-          chmod +x ./gha-script/parse-package-json.sh
-          bash ./gha-script/parse-package-json.sh \
+          chmod +x ./gha-script/v2-script/parse-package-json.sh
+          bash ./gha-script/v2-script/parse-package-json.sh \
             '${{ inputs.package_json }}' \
             '${{ inputs.validate_build_script_v2 }}' \
             '${{ inputs.wheel_build }}' \
@@ -111,8 +108,8 @@ jobs:
         env:
           GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
         run: |
-          chmod +x ./gha-script/download-wheels.sh
-          bash ./gha-script/download-wheels.sh \
+          chmod +x ./gha-script/v2-script/download-wheels.sh
+          bash ./gha-script/v2-script/download-wheels.sh \
             "$GHA_CURRENCY_SERVICE_ID_API_KEY" \
             "$POWERCORE_VERSION"
 
@@ -128,13 +125,13 @@ jobs:
 
       - name: Install PowerCore wheels
         run: |
-          chmod +x ./gha-script/install-powercore.sh
-          bash ./gha-script/install-powercore.sh "$(pwd)/powercore-config.env"
+          chmod +x ./gha-script/v2-script/install-powercore.sh
+          bash ./gha-script/v2-script/install-powercore.sh "$(pwd)/powercore-config.env"
 
       - name: Create PowerCore queue directories
         run: |
-          chmod +x ./gha-script/setup-queues.sh
-          bash ./gha-script/setup-queues.sh
+          chmod +x ./gha-script/v2-script/setup-queues.sh
+          bash ./gha-script/v2-script/setup-queues.sh
 
       - name: Start PowerCore workers
         run: |
@@ -149,14 +146,14 @@ jobs:
           fi
           echo "--- /run/user/${POWERCORE_UID} ready ---"
           sudo ls -la "/run/user/${POWERCORE_UID}"
-          chmod +x ./gha-script/start-workers.sh
-          bash ./gha-script/start-workers.sh
+          chmod +x ./gha-script/v2-script/start-workers.sh
+          bash ./gha-script/v2-script/start-workers.sh
 
       - name: Drop CSV into PowerCore inbox
         id: drop_csv
         run: |
-          chmod +x ./gha-script/drop-csv.sh
-          bash ./gha-script/drop-csv.sh \
+          chmod +x ./gha-script/v2-script/drop-csv.sh
+          bash ./gha-script/v2-script/drop-csv.sh \
             "$POWERCORE_RUNTIME" \
             "${{ github.run_id }}" \
             "$PACKAGE_NAME" \
@@ -168,8 +165,14 @@ jobs:
       - name: Wait for PowerCore pipeline to complete
         timeout-minutes: 180
         run: |
-          chmod +x ./gha-script/poll-pipeline.sh
-          bash ./gha-script/poll-pipeline.sh \
+          chmod +x ./gha-script/v2-script/poll-pipeline.sh
+          bash ./gha-script/v2-script/poll-pipeline.sh \
             "${{ steps.drop_csv.outputs.powercore_runtime }}" \
             "${{ steps.drop_csv.outputs.csv_name }}" \
             "$PACKAGE_NAME"
+
+      - name: Cleanup — teardown PowerCore and remove downloaded files
+        if: always()
+        run: |
+          chmod +x ./gha-script/v2-script/cleanup-powercore.sh
+          bash ./gha-script/v2-script/cleanup-powercore.sh
