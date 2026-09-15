@@ -182,8 +182,8 @@ jobs:
           sudo apt update -y
           sudo apt install -y file git jq unzip python3.12 python3.12-venv python3-pip build-essential patch wget tar libffi-dev zlib1g-dev libssl-dev libxml2-dev libxslt1-dev libicu-dev pkg-config
           GRYPE_VERSION=$(curl -s --retry 3 https://api.github.com/repos/anchore/grype/releases/latest | jq -r '.tag_name')
-          wget --tries=3 "https://github.com/anchore/grype/releases/download/${GRYPE_VERSION}/grype_${GRYPE_VERSION#v}_linux_ppc64le.tar.gz"
-          tar -xzf "grype_${GRYPE_VERSION#v}_linux_ppc64le.tar.gz"
+          wget --tries=3 "https://github.com/anchore/grype/releases/download/${GRYPE_VERSION}/grype_${GRYPE_VERSION#v}_linux_s390x.tar.gz"
+          tar -xzf "grype_${GRYPE_VERSION#v}_linux_s390x.tar.gz"
           mkdir -p scan-tools-bin
           mv grype scan-tools-bin/grype
           chmod +x scan-tools-bin/grype
@@ -353,8 +353,8 @@ jobs:
           sudo apt update -y
           sudo apt install -y file git jq unzip python3.12 python3.12-venv python3-pip build-essential patch wget tar libffi-dev zlib1g-dev libssl-dev libxml2-dev libxslt1-dev libicu-dev pkg-config
           GRYPE_VERSION=$(curl -s --retry 3 https://api.github.com/repos/anchore/grype/releases/latest | jq -r '.tag_name')
-          wget --tries=3 "https://github.com/anchore/grype/releases/download/${GRYPE_VERSION}/grype_${GRYPE_VERSION#v}_linux_ppc64le.tar.gz"
-          tar -xzf "grype_${GRYPE_VERSION#v}_linux_ppc64le.tar.gz"
+          wget --tries=3 "https://github.com/anchore/grype/releases/download/${GRYPE_VERSION}/grype_${GRYPE_VERSION#v}_linux_s390x.tar.gz"
+          tar -xzf "grype_${GRYPE_VERSION#v}_linux_s390x.tar.gz"
           mkdir -p scan-tools-bin
           mv grype scan-tools-bin/grype
           chmod +x scan-tools-bin/grype
@@ -524,8 +524,8 @@ jobs:
           sudo apt update -y
           sudo apt install -y file git jq unzip python3.12 python3.12-venv python3-pip build-essential patch wget tar libffi-dev zlib1g-dev libssl-dev libxml2-dev libxslt1-dev libicu-dev pkg-config
           GRYPE_VERSION=$(curl -s --retry 3 https://api.github.com/repos/anchore/grype/releases/latest | jq -r '.tag_name')
-          wget --tries=3 "https://github.com/anchore/grype/releases/download/${GRYPE_VERSION}/grype_${GRYPE_VERSION#v}_linux_ppc64le.tar.gz"
-          tar -xzf "grype_${GRYPE_VERSION#v}_linux_ppc64le.tar.gz"
+          wget --tries=3 "https://github.com/anchore/grype/releases/download/${GRYPE_VERSION}/grype_${GRYPE_VERSION#v}_linux_s390x.tar.gz"
+          tar -xzf "grype_${GRYPE_VERSION#v}_linux_s390x.tar.gz"
           mkdir -p scan-tools-bin
           mv grype scan-tools-bin/grype
           chmod +x scan-tools-bin/grype
@@ -590,7 +590,7 @@ jobs:
       (needs.wheel_build_py312.result == 'success' ||
        needs.wheel_build_py313.result == 'success' ||
        needs.wheel_build_py314.result == 'success')
-    runs-on: ubuntu-24.04-ppc64le
+    runs-on: ubuntu-24.04-s390x
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -626,7 +626,7 @@ jobs:
   v2_final_summary:
     needs: [v2_license_extraction]
     if: ${{ needs.v2_license_extraction.result == 'success' }}
-    runs-on: ubuntu-24.04-ppc64le
+    runs-on: ubuntu-24.04-s390x
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
