@@ -26,7 +26,7 @@ PKG_VER=$(echo  "$PKG_JSON" | jq -r '.package_version // empty')
 TECH=$(echo     "$PKG_JSON" | jq -r '.technology      // empty')
 TECH_VER=$(echo "$PKG_JSON" | jq -r '.technology_version // (.["  technology_version"] // "")' 2>/dev/null || echo "")
 UBI_VER=$(echo  "$PKG_JSON" | jq -r '.ubi_version // ""')
-ARCH=$(echo "$PKG_JSON" | jq -r '.arch // "ppc64le"')
+ARCH=$(echo "$PKG_JSON" | jq -r '.arch // "s390x"')
 
 echo "--- Validating required fields ---"
 for field in PKG_NAME PKG_VER TECH; do
