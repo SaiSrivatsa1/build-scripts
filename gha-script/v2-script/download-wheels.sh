@@ -8,9 +8,11 @@
 set -euo pipefail
 
 API_KEY="${1:?api_key argument required}"
-CONFIG_URL="https://s3.us-east.cloud-object-storage.appdomain.cloud/powercore-wheels-dev/powercore-config.env"
+COS_ENDPOINT="https://s3.us-east.cloud-object-storage.appdomain.cloud"
+BUCKET="powercore-wheels-dev"
 
-BUCKET_URL="https://s3.us-east.cloud-object-storage.appdomain.cloud/powercore-wheels-dev/s390x"
+CONFIG_URL="${COS_ENDPOINT}/${BUCKET}/powercore-config.env"
+BUCKET_URL="${COS_ENDPOINT}/${BUCKET}"
 LIST_URL="${BUCKET_URL}?list-type=2&prefix=s390x/"
 
 echo "--- Download config ---"
