@@ -12,8 +12,8 @@ COS_ENDPOINT="https://s3.us-east.cloud-object-storage.appdomain.cloud"
 BUCKET="powercore-wheels-dev"
 
 CONFIG_URL="${COS_ENDPOINT}/${BUCKET}/powercore-config.env"
-BUCKET_URL="${COS_ENDPOINT}/${BUCKET}"
-LIST_URL="${BUCKET_URL}?list-type=2&prefix=s390x/"
+BUCKET_URL="${COS_ENDPOINT}/${BUCKET}/s390x"
+LIST_URL="${COS_ENDPOINT}/${BUCKET}?list-type=2"
 
 echo "--- Download config ---"
 echo "  CONFIG_URL        : ${CONFIG_URL}"
