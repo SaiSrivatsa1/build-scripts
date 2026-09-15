@@ -13,7 +13,7 @@ BUCKET="powercore-wheels-dev"
 
 CONFIG_URL="${COS_ENDPOINT}/${BUCKET}/powercore-config.env"
 BUCKET_URL="${COS_ENDPOINT}/${BUCKET}"
-LIST_URL="${BUCKET_URL}?list-type=2&prefix=s390x/"
+LIST_URL="${BUCKET_URL}?list-type=2"
 
 echo "--- Download config ---"
 echo "  CONFIG_URL        : ${CONFIG_URL}"
@@ -83,7 +83,7 @@ required_wheels=(
 
 matched_keys=""
 for wheel_name in "${required_wheels[@]}"; do
-  wheel_key="s390x/${wheel_name}-${POWERCORE_VERSION}-py3-none-any.whl"
+  wheel_key="${wheel_name}-${POWERCORE_VERSION}-py3-none-any.whl"
   if ! printf '%s\n' "$listed_keys" | grep -Fxq "$wheel_key"; then
     echo "ERROR: Required PowerCore wheel was not found in COS: ${wheel_key}"
     exit 1
