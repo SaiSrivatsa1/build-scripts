@@ -13,7 +13,7 @@ BUCKET="powercore-wheels-dev"
 
 CONFIG_URL="${COS_ENDPOINT}/${BUCKET}/powercore-config.env"
 BUCKET_URL="${COS_ENDPOINT}/${BUCKET}/s390x"
-LIST_URL="${COS_ENDPOINT}/${BUCKET}?list-type=&prefix=s390x/"
+LIST_URL="${COS_ENDPOINT}/${BUCKET}?list-type=2&prefix=s390x/"
 
 echo "--- Download config ---"
 echo "  CONFIG_URL        : ${CONFIG_URL}"
