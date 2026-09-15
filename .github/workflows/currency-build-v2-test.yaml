@@ -32,13 +32,8 @@ on:
         options:
           - 'false'
           - 'true'
-      powercore_version:
-        description: 'Version of powercore wheels to download from COS (e.g. 1.2.3)'
-        required: true
-        type: string
 
 run-name: ${{ format('Currency Build V2 — {0} {1}', fromJson(inputs.package_json).package_name, fromJson(inputs.package_json).package_version) }}
-
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -61,8 +56,7 @@ jobs:
             '${{ inputs.package_json }}' \
             '${{ inputs.validate_build_script_v2 }}' \
             '${{ inputs.wheel_build }}' \
-            '${{ inputs.build_docker }}' \
-            '${{ inputs.powercore_version }}'
+            '${{ inputs.build_docker }}'
 
       - name: Upload variable.sh as artifact
         uses: actions/upload-artifact@v4
@@ -111,7 +105,7 @@ jobs:
           chmod +x ./gha-script/v2-script/download-wheels.sh
           bash ./gha-script/v2-script/download-wheels.sh \
             "$GHA_CURRENCY_SERVICE_ID_API_KEY" \
-            "$POWERCORE_VERSION"
+            "$ARCH"
 
       - name: Install IBM Cloud CLI
         run: |
@@ -160,7 +154,8 @@ jobs:
             "$PACKAGE_VERSION" \
             "$TECHNOLOGY" \
             "$TECHNOLOGY_VERSION" \
-            "$UBI_VERSION"
+            "$UBI_VERSION" \
+            "$WHEEL_BUILD"
 
       - name: Wait for PowerCore pipeline to complete
         timeout-minutes: 180

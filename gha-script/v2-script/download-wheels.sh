@@ -2,19 +2,19 @@
 # download-wheels.sh — Fetch PowerCore wheels and powercore-config.env from COS.
 #
 # Usage:
-#   download-wheels.sh <api_key> <powercore_version>
+#   download-wheels.sh <api_key>
 #
 # Output: powercore-wheels/ directory and powercore-config.env in CWD
 set -euo pipefail
 
 API_KEY="${1:?api_key argument required}"
-POWERCORE_VERSION="${2:?powercore_version argument required}"
+CONFIG_URL="https://s3.us-east.cloud-object-storage.appdomain.cloud/powercore-wheels-dev/powercore-config.env"
 
 BUCKET_URL="https://s3.us-east.cloud-object-storage.appdomain.cloud/powercore-wheels-dev"
-LIST_URL="${BUCKET_URL}?list-type=2&prefix=powercore"
+LIST_URL="${BUCKET_URL}?list-type=2"
 
 echo "--- Download config ---"
-echo "  POWERCORE_VERSION : ${POWERCORE_VERSION}"
+echo "  CONFIG_URL        : ${CONFIG_URL}"
 echo "  BUCKET_URL        : ${BUCKET_URL}"
 
 echo "--- Fetching IAM token ---"
@@ -35,7 +35,7 @@ if [[ -z "$token" || "$token" == "null" ]]; then
 fi
 echo "OK: IAM token obtained"
 
-echo "--- Listing COS objects (version: ${POWERCORE_VERSION}) ---"
+echo "--- Listing COS objects ---"
 echo "  List URL: ${LIST_URL}"
 
 list_response=$(curl -sS -H "Authorization: bearer $token" "${LIST_URL}")
@@ -51,29 +51,45 @@ if echo "$list_response" | grep -q "<Error>"; then
   exit 1
 fi
 
-all_keys=$(printf '%s' "$list_response" | tr '<' '\n' | sed -n 's:^Key>\([^<]*\.whl\)$:\1:p')
-if [[ -z "$all_keys" ]]; then
-  echo "ERROR: No wheel files found in COS list response."
-  echo "$list_response"
+POWERCORE_VERSION=$(curl -fsS -H "Authorization: bearer $token" "$CONFIG_URL" \
+  | sed -n 's/^POWERCORE_WHEEL_VERSION=//p' \
+  | head -1 \
+  | tr -d '"' \
+  | xargs)
+if [ -z "$POWERCORE_VERSION" ]; then
+  echo "ERROR: POWERCORE_WHEEL_VERSION is missing from powercore-config.env"
   exit 1
 fi
 
-echo "--- Available wheel keys ---"
-echo "$all_keys" | sed 's/^/  /'
-echo "  (total: $(echo "$all_keys" | wc -l | tr -d ' ') wheels)"
+echo "  POWERCORE_WHEEL_VERSION: ${POWERCORE_VERSION}"
 
-matched_keys=$(echo "$all_keys" | grep -F -- "-${POWERCORE_VERSION}-" || true)
-if [[ -z "$matched_keys" ]]; then
-  echo "ERROR: No wheels matching version '${POWERCORE_VERSION}' in COS."
-  echo "  Available versions:"
-  echo "$all_keys" | grep -oP '\d+\.\d+\.\d+' | sort -u | sed 's/^/    /' || true
-  exit 1
-fi
+listed_keys=$(printf '%s\n' "$list_response" \
+  | grep -oE '<Key>[^<]+</Key>' \
+  | sed -e 's#<Key>##' -e 's#</Key>##')
 
-echo "--- Matched wheels for version ${POWERCORE_VERSION} ---"
-echo "$matched_keys" | sed 's/^/  /'
+required_wheels=(
+  powercore_installer
+  powercore_config
+  powercore_database
+  powercore_preprocess
+  powercore_shallow_scan
+  powercore_deep_scan
+  powercore_postprocess
+  powercore_bookkeeping
+  powercore_workflow
+)
 
-echo "--- Downloading matched wheels ---"
+matched_keys=""
+for wheel_name in "${required_wheels[@]}"; do
+  wheel_key="${wheel_name}-${POWERCORE_VERSION}-py3-none-any.whl"
+  if ! printf '%s\n' "$listed_keys" | grep -Fxq "$wheel_key"; then
+    echo "ERROR: Required PowerCore wheel was not found in COS: ${wheel_key}"
+    exit 1
+  fi
+  matched_keys+="${wheel_key}"$'\n'
+done
+
+echo "--- Downloading required PowerCore wheels for version ${POWERCORE_VERSION} ---"
 mkdir -p powercore-wheels
 while IFS= read -r wheel_key; do
   [[ -z "$wheel_key" ]] && continue
@@ -87,8 +103,7 @@ while IFS= read -r wheel_key; do
   echo "    OK: $(ls -lh "powercore-wheels/$(basename "$wheel_key")" | awk '{print $5}')"
 done <<< "$matched_keys"
 
-echo "--- Downloaded wheels ---"
-ls -lh powercore-wheels/
+echo "--- Wheel download complete ---"
 
 echo "--- Downloading powercore-config.env ---"
 if ! curl -fsS -H "Authorization: bearer $token" \
