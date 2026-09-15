@@ -244,7 +244,7 @@ jobs:
   wheel_build_py313:
     needs: build_info
     if: ${{ inputs.wheel_build == 'true' || fromJson(inputs.package_json).technology_version == '3.13' }}
-    runs-on: ${{ inputs.large-runner-label != '' && inputs.large-runner-label || 'ubuntu-24.04-ppc64le' }}
+    runs-on: ubuntu-24.04-s390x
     env:
       PYTHON_VERSION: "3.13"
     steps:
@@ -415,7 +415,7 @@ jobs:
   wheel_build_py314:
     needs: build_info
     if: ${{ inputs.wheel_build == 'true' || fromJson(inputs.package_json).technology_version == '3.14' }}
-    runs-on: ${{ inputs.large-runner-label != '' && inputs.large-runner-label || 'ubuntu-24.04-ppc64le' }}
+    runs-on: ubuntu-24.04-s390x
     env:
       PYTHON_VERSION: "3.14"
     steps:
