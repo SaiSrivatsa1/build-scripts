@@ -110,7 +110,7 @@ jobs:
   # ---------------------------------------------------------------------------
   wheel_build_ubi9_py312:
     needs: install_scan_tools
-    if: ${{ (inputs.wheel_build == 'false' && (fromJson(inputs.package_json).ubi_version == '' || contains(fromJson(inputs.package_json).ubi_version, 'ubi9')) && fromJson(inputs.package_json).technology_version == '3.12') }}
+    if: ${{ (inputs.wheel_build == 'true' && (fromJson(inputs.package_json).ubi_version == '' || contains(fromJson(inputs.package_json).ubi_version, 'ubi9')) && fromJson(inputs.package_json).technology_version == '3.12') }}
     runs-on: ubuntu-24.04-s390x
     env:
       PYTHON_VERSION: "3.12"
@@ -318,7 +318,7 @@ jobs:
 
   wheel_build_ubi9_py313:
     needs: install_scan_tools
-    if: ${{ (inputs.wheel_build == 'false' && (fromJson(inputs.package_json).ubi_version == '' || contains(fromJson(inputs.package_json).ubi_version, 'ubi9')) && fromJson(inputs.package_json).technology_version == '3.13') }}
+    if: ${{ (inputs.wheel_build == 'true' && (fromJson(inputs.package_json).ubi_version == '' || contains(fromJson(inputs.package_json).ubi_version, 'ubi9')) && fromJson(inputs.package_json).technology_version == '3.13') }}
     runs-on: ubuntu-24.04-s390x
     env:
       PYTHON_VERSION: "3.13"
@@ -526,7 +526,7 @@ jobs:
 
   wheel_build_ubi9_py314:
     needs: install_scan_tools
-    if: ${{ (inputs.wheel_build == 'false' && (fromJson(inputs.package_json).ubi_version == '' || contains(fromJson(inputs.package_json).ubi_version, 'ubi9')) && fromJson(inputs.package_json).technology_version == '3.14') }}
+    if: ${{ (inputs.wheel_build == 'true' && (fromJson(inputs.package_json).ubi_version == '' || contains(fromJson(inputs.package_json).ubi_version, 'ubi9')) && fromJson(inputs.package_json).technology_version == '3.14') }}
     runs-on: ubuntu-24.04-s390x
     env:
       PYTHON_VERSION: "3.14"
