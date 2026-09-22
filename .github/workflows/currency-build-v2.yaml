@@ -248,7 +248,7 @@ jobs:
           else
             echo "ERROR: '${PACKAGE_NAME}' did not build successfully (status=${STATUS:-not found})." >&2
             echo "All package results:"
-            sudo -u powercore awk -F',' 'NR>1 && NF>1 { gsub(/\r/,""); print "  " \$0 }' "$CSV" || true
+            sudo -u powercore awk -F',' 'NR>1 && NF>1 { gsub(/\r/,""); print "  " $0 }' "$CSV" || true
             exit 1
           fi
 
@@ -456,7 +456,7 @@ jobs:
           else
             echo "ERROR: '${PACKAGE_NAME}' did not build successfully (status=${STATUS:-not found})." >&2
             echo "All package results:"
-            sudo -u powercore awk -F',' 'NR>1 && NF>1 { gsub(/\r/,""); print "  " \$0 }' "$CSV" || true
+            sudo -u powercore awk -F',' 'NR>1 && NF>1 { gsub(/\r/,""); print "  " $0 }' "$CSV" || true
             exit 1
           fi
 
@@ -664,7 +664,7 @@ jobs:
           else
             echo "ERROR: '${PACKAGE_NAME}' did not build successfully (status=${STATUS:-not found})." >&2
             echo "All package results:"
-            sudo -u powercore awk -F',' 'NR>1 && NF>1 { gsub(/\r/,""); print "  " \$0 }' "$CSV" || true
+            sudo -u powercore awk -F',' 'NR>1 && NF>1 { gsub(/\r/,""); print "  " $0 }' "$CSV" || true
             exit 1
           fi
 
