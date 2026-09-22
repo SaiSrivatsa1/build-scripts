@@ -34,8 +34,8 @@ on:
           - 'true'
 
 run-name: >
-  ${{ format('Retriggered Currency Build V2 for {0} on {1}', fromJson(inputs.package_json).package_name, inputs.large-runner-label) ||
-      format('Currency Build V2 — {0} {1}', fromJson(inputs.package_json).package_name, fromJson(inputs.package_json).package_version)
+  ${{ 
+    format('Currency Build V2 — {0} {1}', fromJson(inputs.package_json).package_name, fromJson(inputs.package_json).package_version)
   }}
 
 jobs:
