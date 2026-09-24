@@ -3,15 +3,15 @@
 #
 # Usage:
 #   parse-package-json.sh <package_json> \
-#     <validate_build_script_v2> <wheel_build> <build_docker>
+#     <v2_enabled> <trigger_all_python_builds> <build_docker>
 #
 # Output: variable.sh written to CWD
 set -euo pipefail
 
 PKG_JSON="${1:?package_json argument required}"
-VALIDATE_BUILD_SCRIPT_V2="${2:?validate_build_script_v2 required}"
-WHEEL_BUILD="${3:?wheel_build required}"
-BUILD_DOCKER="${4:?build_docker required}"
+V2_ENABLED="${2:-true}"
+TRIGGER_ALL_PYTHON_BUILDS="${3:-false}"
+BUILD_DOCKER="${4:-false}"
 
 echo "--- Validating package_json ---"
 if ! echo "$PKG_JSON" | jq empty 2>/dev/null; then
@@ -48,8 +48,8 @@ printf '%s\n' \
   "TECHNOLOGY_VERSION=\"${TECH_VER}\"" \
   "UBI_VERSION=\"${UBI_VER}\"" \
   "ARCH=\"${ARCH}\"" \
-  "VALIDATE_BUILD_SCRIPT_V2=\"${VALIDATE_BUILD_SCRIPT_V2}\"" \
-  "WHEEL_BUILD=\"${WHEEL_BUILD}\"" \
+  "V2_ENABLED=\"${V2_ENABLED}\"" \
+  "TRIGGER_ALL_PYTHON_BUILDS=\"${TRIGGER_ALL_PYTHON_BUILDS}\"" \
   "BUILD_DOCKER=\"${BUILD_DOCKER}\"" \
   > variable.sh
 

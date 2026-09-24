@@ -8,7 +8,7 @@ on:
           {"package_name":"brotlipy","package_version":"v0.8.0","technology":"python","technology_version":"3.12","ubi_version":"ubi9"}
         required: true
         type: string
-      validate_build_script_v2:
+      v2_enabled:
         description: 'Run v2 build script via powercore'
         required: true
         default: 'false'
@@ -16,7 +16,7 @@ on:
         options:
           - 'false'
           - 'true'
-      wheel_build:
+      trigger_all_python_builds:
         description: 'Create wheel for all Python versions and UBI versions via powercore'
         required: true
         default: 'false'
@@ -32,10 +32,19 @@ on:
         options:
           - 'false'
           - 'true'
+      powercore_version:
+        description: 'PowerCore wheel version to install (e.g. 1.3.3)'
+        required: true
+        type: string
+      unique_id:
+        description: 'Unique ID for the build'
+        required: false
+        default: 'None'
 
 run-name: >
   ${{ 
-    format('Currency Build V2 — {0} {1}', fromJson(inputs.package_json).package_name, fromJson(inputs.package_json).package_version)
+    format('Currency Build V2 — {0} {1} && Unique ID {2}', fromJson(inputs.package_json).package_name, fromJson(inputs.package_json).package_version, inputs.unique_id) ||
+    format('Retriggered Currency Build V2 for {0} and Unique ID {1} on {2}', fromJson(inputs.package_json).package_name, fromJson(inputs.package_json).package_version, inputs.unique_id)
   }}
 
 jobs:
@@ -57,8 +66,8 @@ jobs:
           chmod +x ./gha-script/v2-script/parse-package-json.sh
           bash ./gha-script/v2-script/parse-package-json.sh \
             '${{ inputs.package_json }}' \
-            '${{ inputs.validate_build_script_v2 }}' \
-            '${{ inputs.wheel_build }}' \
+            '${{ inputs.v2_enabled }}' \
+            '${{ inputs.trigger_all_python_build }}' \
             '${{ inputs.build_docker }}'
 
       - name: Upload variable.sh as artifact
@@ -67,12 +76,11 @@ jobs:
           name: build-info
           path: variable.sh
 
+  # prepare_shared_artifacts: Downloads grype, scancode-toolkit, and PowerCore
+  # wheels from COS, and generates powercore-config.env from Secrets Manager.
+  # All wheel-build jobs reuse these artifacts instead of repeating the work.
   # ---------------------------------------------------------------------------
-  # install_scan_tools: Downloads grype and scancode-toolkit once and uploads
-  # them as a GHA artifact. All 6 wheel jobs reuse this instead of
-  # re-downloading on every runner.
-  # ---------------------------------------------------------------------------
-  install_scan_tools:
+  prepare_shared_artifacts:
     needs: build_info
     runs-on: ubuntu-24.04-s390x
     steps:
@@ -80,7 +88,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install jq and wget
-        run: sudo apt update -y && sudo apt install -y jq wget
+        run: sudo apt update -y && sudo apt install -y jq wget curl
 
       - name: Download grype
         run: |
@@ -95,6 +103,18 @@ jobs:
         run: |
           chmod +x ./gha-script/v2-script/scanner-scripts/fetch_scancode_toolkit.sh
           bash ./gha-script/v2-script/scanner-scripts/fetch_scancode_toolkit.sh
+      
+      - name: Download powercore-wheels artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: powercore-wheels
+          path: powercore-wheels/
+
+      - name: Download powercore-config artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: powercore-config
+          path: .
 
       - name: Upload scan-tools artifact
         uses: actions/upload-artifact@v4
@@ -103,14 +123,460 @@ jobs:
           path: |
             scan-tools-bin/
             scancode-toolkit-src.tar.gz
+          
+      - name: Upload powercore-wheels artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: powercore-wheels
+          path: powercore-wheels/
+
+      - name: Upload powercore-config artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: powercore-config
+          path: powercore-config.env
 
   # ---------------------------------------------------------------------------
-  # Wheel build jobs — 3 per UBI version ubi9, all parallel.
-  # UBI version is hardcoded per job; if conditions gate which jobs run.
+  # Wheel build jobs — 5 for ubi9 (py310/311/312/313/314) UBI version is hardcoded per job; if
+  # conditions gate which jobs run.
   # ---------------------------------------------------------------------------
+  wheel_build_ubi9_py310:
+    needs: prepare_shared_artifacts
+    if: ${{ (inputs.trigger_all_python_build == 'true' || (inputs.trigger_all_python_builds == 'false' && (fromJson(inputs.package_json).ubi_version == '' || contains(fromJson(inputs.package_json).ubi_version, 'ubi9')) && contains(fromJson(inputs.package_json).technology_version), '3.10')) }}
+    runs-on: ubuntu-24.04-s390x
+    env:
+      PYTHON_VERSION: "3.10"
+      UBI_VERSION: "ubi9"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build-info artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-info
+
+      - name: Load variable.sh into job environment
+        run: |
+          echo "===== variable.sh ====="
+          cat variable.sh
+          echo "======================="
+          while IFS='=' read -r key value; do
+            key="${key// /}"
+            [[ -z "$key" || "$key" == \#* ]] && continue
+            # UBI_VERSION and PYTHON_VERSION are set at job level — do not overwrite
+            [[ "$key" == "UBI_VERSION" || "$key" == "PYTHON_VERSION" ]] && continue
+            value="${value%\"}"
+            value="${value#\"}"
+            echo "${key}=${value}" >> "$GITHUB_ENV"
+          done < variable.sh
+
+      - name: Install system dependencies
+        run: sudo apt update -y && sudo apt install -y wget curl tar jq git
+
+      - name: Download PowerCore wheels from COS
+        env:
+          GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
+        run: |
+          chmod +x ./gha-script/v2-script/download-wheels.sh
+          bash ./gha-script/v2-script/download-wheels.sh \
+            "$GHA_CURRENCY_SERVICE_ID_API_KEY" \
+            "${{ inputs.powercore_version }}"
+
+      - name: Generate powercore-config.env from Secrets Manager
+        env:
+          GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
+        run: |
+          chmod +x ./gha-script/v2-script/generate-powercore-config.sh
+          bash ./gha-script/v2-script/generate-powercore-config.sh \
+            --api-key  "$GHA_CURRENCY_SERVICE_ID_API_KEY" \
+            --version  "${{ inputs.powercore_version }}" \
+            --gh-token "${{ secrets.GH_TOKEN  }}"
+
+      - name: Install IBM Cloud CLI
+        run: |
+          echo "--- Installing IBM Cloud CLI ---"
+          curl -fsSL https://clis.cloud.ibm.com/install/linux | sudo sh
+          ibmcloud version
+          echo "--- Installing plugins ---"
+          ibmcloud plugin install cloud-object-storage -f
+          ibmcloud plugin install container-registry -f
+          ibmcloud plugin list
+
+      - name: Install PowerCore wheels
+        run: |
+          chmod +x ./gha-script/v2-script/install-powercore.sh
+          bash ./gha-script/v2-script/install-powercore.sh "$(pwd)/powercore-config.env"
+
+      - name: Create PowerCore queue directories
+        run: |
+          chmod +x ./gha-script/v2-script/setup-queues.sh
+          bash ./gha-script/v2-script/setup-queues.sh
+
+      - name: Start PowerCore workers
+        run: |
+          POWERCORE_UID=$(id -u powercore)
+          if [ ! -d "/run/user/${POWERCORE_UID}" ]; then
+            echo "--- Creating /run/user/${POWERCORE_UID} ---"
+            sudo mkdir -p "/run/user/${POWERCORE_UID}"
+            sudo chown "${POWERCORE_UID}:${POWERCORE_UID}" "/run/user/${POWERCORE_UID}"
+            sudo chmod 700 "/run/user/${POWERCORE_UID}"
+            sudo loginctl enable-linger powercore || true
+            sleep 3
+          fi
+          echo "--- /run/user/${POWERCORE_UID} ready ---"
+          sudo ls -la "/run/user/${POWERCORE_UID}"
+          chmod +x ./gha-script/v2-script/start-workers.sh
+          bash ./gha-script/v2-script/start-workers.sh
+
+      - name: Drop CSV into PowerCore inbox
+        id: drop_csv
+        run: |
+          chmod +x ./gha-script/v2-script/drop-csv.sh
+          bash ./gha-script/v2-script/drop-csv.sh \
+            "$POWERCORE_RUNTIME" \
+            "${{ github.run_id }}" \
+            "$PACKAGE_NAME" \
+            "$PACKAGE_VERSION" \
+            "$TECHNOLOGY" \
+            "${{ env.PYTHON_VERSION }}" \
+            "${{ env.UBI_VERSION }}" \
+            "false"
+
+      - name: Wait for PowerCore pipeline to complete
+        timeout-minutes: 180
+        run: |
+          chmod +x ./gha-script/v2-script/poll-pipeline.sh
+          bash ./gha-script/v2-script/poll-pipeline.sh \
+            "${{ steps.drop_csv.outputs.powercore_runtime }}" \
+            "${{ steps.drop_csv.outputs.csv_name }}" \
+            "$PACKAGE_NAME"
+
+      - name: Verify V2 wheel was produced
+        run: |
+          # Check results_summary.csv — column "Validation Status", success value "success".
+          # PACKAGE_NAME must have status "success" to proceed; dependency failures are ignored.
+          REQUEST_DIR=$(sudo -u powercore find "$POWERCORE_RUNTIME" -type d -name 'BRequest_*' 2>/dev/null | sort | tail -1)
+          if [ -z "$REQUEST_DIR" ]; then
+            echo "ERROR: No BRequest directory found under $POWERCORE_RUNTIME." >&2
+            exit 1
+          fi
+          CSV=$(sudo -u powercore find "$REQUEST_DIR" -name 'results_summary.csv' 2>/dev/null | head -1)
+          if [ -z "$CSV" ]; then
+            echo "ERROR: results_summary.csv not found — PowerCore post-process may have failed." >&2
+            exit 1
+          fi
+          echo "Results CSV: $CSV"
+          # Normalize: hyphens and underscores are interchangeable in package names
+          PKG_NORM="${PACKAGE_NAME//-/_}"
+          STATUS=$(sudo -u powercore awk -F',' -v pkg="$PKG_NORM" '
+            NR==1 {
+              for (i=1;i<=NF;i++) {
+                gsub(/\r/,"",$i); gsub(/^ +| +$/,"",$i)
+                if ($i=="Package" || $i=="package_name" || $i=="name") ni=i
+                if ($i=="Validation Status" || $i=="status") si=i
+              }
+              next
+            }
+            NF>1 {
+              gsub(/\r/,"")
+              n=(ni?$ni:"?"); gsub(/-/,"_",n); gsub(/^ +| +$/,"",n)
+              s=(si?$si:"");  gsub(/^ +| +$/,"",s)
+              if (n==pkg && si) { print s; exit }
+            }
+          ' "$CSV" 2>/dev/null || true)
+          echo "Build status for '${PACKAGE_NAME}': ${STATUS:-not found}"
+          if [ "$STATUS" = "success" ]; then
+            echo "Wheel build verified for '${PACKAGE_NAME}'."
+          else
+            echo "ERROR: '${PACKAGE_NAME}' did not build successfully (status=${STATUS:-not found})." >&2
+            echo "All package results:"
+            sudo -u powercore awk -F',' 'NR>1 && NF>1 { gsub(/\r/,""); print "  " $0 }' "$CSV" || true
+            exit 1
+          fi
+
+      - name: Install system scanner packages
+        run: |
+          sudo apt update -y
+          sudo apt install -y file git jq unzip python3.12 python3.12-venv python3-pip build-essential patch wget tar libffi-dev zlib1g-dev libssl-dev libxml2-dev libxslt1-dev libicu-dev pkg-config
+
+      - name: Download scan-tools artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: scan-tools
+
+      - name: Prepare scan tools
+        run: |
+          chmod +x scan-tools-bin/grype
+          tar -xzf scancode-toolkit-src.tar.gz
+
+      - name: Prepare V2 scan workspace
+        run: |
+          chmod +x ./gha-script/v2-script/prepare_scan_workspace.sh
+          bash ./gha-script/v2-script/prepare_scan_workspace.sh \
+            "$POWERCORE_RUNTIME" \
+            "$PACKAGE_NAME" \
+            "$GITHUB_WORKSPACE/v2-scan-workspace"
+
+      - name: Run V2 source scans
+        run: |
+          if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/package-cache/source" ]; then
+            chmod +x ./gha-script/v2-script/scan_source.sh
+            GRYPE_BIN="$GITHUB_WORKSPACE/scan-tools-bin/grype" \
+              bash ./gha-script/v2-script/scan_source.sh "$GITHUB_WORKSPACE/v2-scan-workspace" "$GITHUB_WORKSPACE"
+          else
+            echo "No source directory was preserved by PowerCore; source scans skipped."
+          fi
+
+      - name: Run V2 wheel scans
+        run: |
+          if find "$GITHUB_WORKSPACE/v2-scan-workspace/wheels" -maxdepth 1 -name '*.whl' -print -quit | grep -q .; then
+            chmod +x ./gha-script/v2-script/scan_wheel.sh
+            GRYPE_BIN="$GITHUB_WORKSPACE/scan-tools-bin/grype" \
+              bash ./gha-script/v2-script/scan_wheel.sh "$GITHUB_WORKSPACE/v2-scan-workspace" "$GITHUB_WORKSPACE"
+          else
+            echo "No wheel was preserved by PowerCore; wheel scans skipped."
+          fi
+
+      - name: Remove scanner installation files
+        run: |
+          rm -rf "$GITHUB_WORKSPACE/v2-scan-workspace/scancode-toolkit"
+          rm -f "$GITHUB_WORKSPACE/v2-scan-workspace/package-cache"/*.tar.gz
+          rm -f "$GITHUB_WORKSPACE/v2-scan-workspace/package-cache"/*checksums.txt
+
+      - name: Archive and upload V2 scan results to COS
+        env:
+          GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
+          GHA_RUN_ID: ${{ github.run_id }}
+        run: |
+          ARTIFACT_NAME="${PACKAGE_NAME}-${PACKAGE_VERSION}-v2-scan-result-${{ env.UBI_VERSION }}-${{ env.PYTHON_VERSION }}"
+          tar -czf "${ARTIFACT_NAME}.tar.gz" v2-scan-workspace
+          chmod +x ./gha-script/v2-script/upload_to_cos.sh
+          bash ./gha-script/v2-script/upload_to_cos.sh "${ARTIFACT_NAME}.tar.gz"
+
+      - name: Cleanup — teardown PowerCore and remove downloaded files
+        if: always()
+        run: |
+          chmod +x ./gha-script/v2-script/cleanup-powercore.sh
+          bash ./gha-script/v2-script/cleanup-powercore.sh
+
+  wheel_build_ubi9_py311:
+    needs: prepare_shared_artifacts
+    if: ${{ (inputs.trigger_all_python_build == 'true' || (inputs.trigger_all_python_builds == 'false' && (fromJson(inputs.package_json).ubi_version == '' || contains(fromJson(inputs.package_json).ubi_version, 'ubi9')) && contains(fromJson(inputs.package_json).technology_version), '3.11')) }}
+    runs-on: ubuntu-24.04-s390x
+    env:
+      PYTHON_VERSION: "3.11"
+      UBI_VERSION: "ubi9"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build-info artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-info
+
+      - name: Load variable.sh into job environment
+        run: |
+          echo "===== variable.sh ====="
+          cat variable.sh
+          echo "======================="
+          while IFS='=' read -r key value; do
+            key="${key// /}"
+            [[ -z "$key" || "$key" == \#* ]] && continue
+            # UBI_VERSION and PYTHON_VERSION are set at job level — do not overwrite
+            [[ "$key" == "UBI_VERSION" || "$key" == "PYTHON_VERSION" ]] && continue
+            value="${value%\"}"
+            value="${value#\"}"
+            echo "${key}=${value}" >> "$GITHUB_ENV"
+          done < variable.sh
+
+      - name: Install system dependencies
+        run: sudo apt update -y && sudo apt install -y wget curl tar jq git
+
+      - name: Download powercore-wheels artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: powercore-wheels
+          path: powercore-wheels/
+
+       - name: Download powercore-config artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: powercore-config
+          path: .
+
+      - name: Install IBM Cloud CLI
+        run: |
+          echo "--- Installing IBM Cloud CLI ---"
+          curl -fsSL https://clis.cloud.ibm.com/install/linux | sudo sh
+          ibmcloud version
+          echo "--- Installing plugins ---"
+          ibmcloud plugin install cloud-object-storage -f
+          ibmcloud plugin install container-registry -f
+          ibmcloud plugin list
+
+      - name: Install PowerCore wheels
+        run: |
+          chmod +x ./gha-script/v2-script/install-powercore.sh
+          bash ./gha-script/v2-script/install-powercore.sh "$(pwd)/powercore-config.env"
+
+      - name: Create PowerCore queue directories
+        run: |
+          chmod +x ./gha-script/v2-script/setup-queues.sh
+          bash ./gha-script/v2-script/setup-queues.sh
+
+      - name: Start PowerCore workers
+        run: |
+          POWERCORE_UID=$(id -u powercore)
+          if [ ! -d "/run/user/${POWERCORE_UID}" ]; then
+            echo "--- Creating /run/user/${POWERCORE_UID} ---"
+            sudo mkdir -p "/run/user/${POWERCORE_UID}"
+            sudo chown "${POWERCORE_UID}:${POWERCORE_UID}" "/run/user/${POWERCORE_UID}"
+            sudo chmod 700 "/run/user/${POWERCORE_UID}"
+            sudo loginctl enable-linger powercore || true
+            sleep 3
+          fi
+          echo "--- /run/user/${POWERCORE_UID} ready ---"
+          sudo ls -la "/run/user/${POWERCORE_UID}"
+          chmod +x ./gha-script/v2-script/start-workers.sh
+          bash ./gha-script/v2-script/start-workers.sh
+
+      - name: Drop CSV into PowerCore inbox
+        id: drop_csv
+        run: |
+          chmod +x ./gha-script/v2-script/drop-csv.sh
+          bash ./gha-script/v2-script/drop-csv.sh \
+            "$POWERCORE_RUNTIME" \
+            "${{ github.run_id }}" \
+            "$PACKAGE_NAME" \
+            "$PACKAGE_VERSION" \
+            "$TECHNOLOGY" \
+            "${{ env.PYTHON_VERSION }}" \
+            "${{ env.UBI_VERSION }}" \
+            "false"
+
+      - name: Wait for PowerCore pipeline to complete
+        timeout-minutes: 180
+        run: |
+          chmod +x ./gha-script/v2-script/poll-pipeline.sh
+          bash ./gha-script/v2-script/poll-pipeline.sh \
+            "${{ steps.drop_csv.outputs.powercore_runtime }}" \
+            "${{ steps.drop_csv.outputs.csv_name }}" \
+            "$PACKAGE_NAME"
+
+      - name: Verify V2 wheel was produced
+        run: |
+          # Check results_summary.csv — column "Validation Status", success value "success".
+          # PACKAGE_NAME must have status "success" to proceed; dependency failures are ignored.
+          REQUEST_DIR=$(sudo -u powercore find "$POWERCORE_RUNTIME" -type d -name 'BRequest_*' 2>/dev/null | sort | tail -1)
+          if [ -z "$REQUEST_DIR" ]; then
+            echo "ERROR: No BRequest directory found under $POWERCORE_RUNTIME." >&2
+            exit 1
+          fi
+          CSV=$(sudo -u powercore find "$REQUEST_DIR" -name 'results_summary.csv' 2>/dev/null | head -1)
+          if [ -z "$CSV" ]; then
+            echo "ERROR: results_summary.csv not found — PowerCore post-process may have failed." >&2
+            exit 1
+          fi
+          echo "Results CSV: $CSV"
+          # Normalize: hyphens and underscores are interchangeable in package names
+          PKG_NORM="${PACKAGE_NAME//-/_}"
+          STATUS=$(sudo -u powercore awk -F',' -v pkg="$PKG_NORM" '
+            NR==1 {
+              for (i=1;i<=NF;i++) {
+                gsub(/\r/,"",$i); gsub(/^ +| +$/,"",$i)
+                if ($i=="Package" || $i=="package_name" || $i=="name") ni=i
+                if ($i=="Validation Status" || $i=="status") si=i
+              }
+              next
+            }
+            NF>1 {
+              gsub(/\r/,"")
+              n=(ni?$ni:"?"); gsub(/-/,"_",n); gsub(/^ +| +$/,"",n)
+              s=(si?$si:"");  gsub(/^ +| +$/,"",s)
+              if (n==pkg && si) { print s; exit }
+            }
+          ' "$CSV" 2>/dev/null || true)
+          echo "Build status for '${PACKAGE_NAME}': ${STATUS:-not found}"
+          if [ "$STATUS" = "success" ]; then
+            echo "Wheel build verified for '${PACKAGE_NAME}'."
+          else
+            echo "ERROR: '${PACKAGE_NAME}' did not build successfully (status=${STATUS:-not found})." >&2
+            echo "All package results:"
+            sudo -u powercore awk -F',' 'NR>1 && NF>1 { gsub(/\r/,""); print "  " $0 }' "$CSV" || true
+            exit 1
+          fi
+
+      - name: Install system scanner packages
+        run: |
+          sudo apt update -y
+          sudo apt install -y file git jq unzip python3.12 python3.12-venv python3-pip build-essential patch wget tar libffi-dev zlib1g-dev libssl-dev libxml2-dev libxslt1-dev libicu-dev pkg-config
+
+      - name: Download scan-tools artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: scan-tools
+
+      - name: Prepare scan tools
+        run: |
+          chmod +x scan-tools-bin/grype
+          tar -xzf scancode-toolkit-src.tar.gz
+
+      - name: Prepare V2 scan workspace
+        run: |
+          chmod +x ./gha-script/v2-script/prepare_scan_workspace.sh
+          bash ./gha-script/v2-script/prepare_scan_workspace.sh \
+            "$POWERCORE_RUNTIME" \
+            "$PACKAGE_NAME" \
+            "$GITHUB_WORKSPACE/v2-scan-workspace"
+
+      - name: Run V2 source scans
+        run: |
+          if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/package-cache/source" ]; then
+            chmod +x ./gha-script/v2-script/scan_source.sh
+            GRYPE_BIN="$GITHUB_WORKSPACE/scan-tools-bin/grype" \
+              bash ./gha-script/v2-script/scan_source.sh "$GITHUB_WORKSPACE/v2-scan-workspace" "$GITHUB_WORKSPACE"
+          else
+            echo "No source directory was preserved by PowerCore; source scans skipped."
+          fi
+
+      - name: Run V2 wheel scans
+        run: |
+          if find "$GITHUB_WORKSPACE/v2-scan-workspace/wheels" -maxdepth 1 -name '*.whl' -print -quit | grep -q .; then
+            chmod +x ./gha-script/v2-script/scan_wheel.sh
+            GRYPE_BIN="$GITHUB_WORKSPACE/scan-tools-bin/grype" \
+              bash ./gha-script/v2-script/scan_wheel.sh "$GITHUB_WORKSPACE/v2-scan-workspace" "$GITHUB_WORKSPACE"
+          else
+            echo "No wheel was preserved by PowerCore; wheel scans skipped."
+          fi
+
+      - name: Remove scanner installation files
+        run: |
+          rm -rf "$GITHUB_WORKSPACE/v2-scan-workspace/scancode-toolkit"
+          rm -f "$GITHUB_WORKSPACE/v2-scan-workspace/package-cache"/*.tar.gz
+          rm -f "$GITHUB_WORKSPACE/v2-scan-workspace/package-cache"/*checksums.txt
+
+      - name: Archive and upload V2 scan results to COS
+        env:
+          GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
+          GHA_RUN_ID: ${{ github.run_id }}
+        run: |
+          ARTIFACT_NAME="${PACKAGE_NAME}-${PACKAGE_VERSION}-v2-scan-result-${{ env.UBI_VERSION }}-${{ env.PYTHON_VERSION }}"
+          tar -czf "${ARTIFACT_NAME}.tar.gz" v2-scan-workspace
+          chmod +x ./gha-script/v2-script/upload_to_cos.sh
+          bash ./gha-script/v2-script/upload_to_cos.sh "${ARTIFACT_NAME}.tar.gz"
+
+      - name: Cleanup — teardown PowerCore and remove downloaded files
+        if: always()
+        run: |
+          chmod +x ./gha-script/v2-script/cleanup-powercore.sh
+          bash ./gha-script/v2-script/cleanup-powercore.sh
+
+
   wheel_build_ubi9_py312:
-    needs: install_scan_tools
-    if: ${{ (inputs.wheel_build == 'true' && (fromJson(inputs.package_json).ubi_version == '' || contains(fromJson(inputs.package_json).ubi_version, 'ubi9')) && fromJson(inputs.package_json).technology_version == '3.12') }}
+    needs: prepare_shared_artifacts
+    if: ${{ (inputs.trigger_all_python_build == 'true' || (inputs.trigger_all_python_builds == 'false' && (fromJson(inputs.package_json).ubi_version == '' || contains(fromJson(inputs.package_json).ubi_version, 'ubi9')) && contains(fromJson(inputs.package_json).technology_version), '3.12')) }}
     runs-on: ubuntu-24.04-s390x
     env:
       PYTHON_VERSION: "3.12"
@@ -142,13 +608,17 @@ jobs:
       - name: Install system dependencies
         run: sudo apt update -y && sudo apt install -y wget curl tar jq git
 
-      - name: Download PowerCore wheels from COS
-        env:
-          GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
-        run: |
-          chmod +x ./gha-script/v2-script/download-wheels.sh
-          bash ./gha-script/v2-script/download-wheels.sh \
-            "$GHA_CURRENCY_SERVICE_ID_API_KEY"
+      - name: Download powercore-wheels artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: powercore-wheels
+          path: powercore-wheels/
+
+       - name: Download powercore-config artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: powercore-config
+          path: .
 
       - name: Install IBM Cloud CLI
         run: |
@@ -304,6 +774,7 @@ jobs:
       - name: Archive and upload V2 scan results to COS
         env:
           GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
+          GHA_RUN_ID: ${{ github.run_id }}
         run: |
           ARTIFACT_NAME="${PACKAGE_NAME}-${PACKAGE_VERSION}-v2-scan-result-${{ env.UBI_VERSION }}-${{ env.PYTHON_VERSION }}"
           tar -czf "${ARTIFACT_NAME}.tar.gz" v2-scan-workspace
@@ -317,8 +788,8 @@ jobs:
           bash ./gha-script/v2-script/cleanup-powercore.sh
 
   wheel_build_ubi9_py313:
-    needs: install_scan_tools
-    if: ${{ (inputs.wheel_build == 'true' && (fromJson(inputs.package_json).ubi_version == '' || contains(fromJson(inputs.package_json).ubi_version, 'ubi9')) && fromJson(inputs.package_json).technology_version == '3.13') }}
+    needs: prepare_shared_artifacts
+    if: ${{ (inputs.trigger_all_python_build == 'true' || (inputs.trigger_all_python_builds == 'false' && (fromJson(inputs.package_json).ubi_version == '' || contains(fromJson(inputs.package_json).ubi_version, 'ubi9')) && contains(fromJson(inputs.package_json).technology_version), '3.13')) }}
     runs-on: ubuntu-24.04-s390x
     env:
       PYTHON_VERSION: "3.13"
@@ -350,13 +821,17 @@ jobs:
       - name: Install system dependencies
         run: sudo apt update -y && sudo apt install -y wget curl tar jq git
 
-      - name: Download PowerCore wheels from COS
-        env:
-          GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
-        run: |
-          chmod +x ./gha-script/v2-script/download-wheels.sh
-          bash ./gha-script/v2-script/download-wheels.sh \
-            "$GHA_CURRENCY_SERVICE_ID_API_KEY"
+      - name: Download powercore-wheels artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: powercore-wheels
+          path: powercore-wheels/
+
+      - name: Download powercore-config artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: powercore-config
+          path: .
 
       - name: Install IBM Cloud CLI
         run: |
@@ -512,6 +987,7 @@ jobs:
       - name: Archive and upload V2 scan results to COS
         env:
           GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
+          GHA_RUN_ID: ${{ github.run_id }}
         run: |
           ARTIFACT_NAME="${PACKAGE_NAME}-${PACKAGE_VERSION}-v2-scan-result-${{ env.UBI_VERSION }}-${{ env.PYTHON_VERSION }}"
           tar -czf "${ARTIFACT_NAME}.tar.gz" v2-scan-workspace
@@ -525,8 +1001,8 @@ jobs:
           bash ./gha-script/v2-script/cleanup-powercore.sh
 
   wheel_build_ubi9_py314:
-    needs: install_scan_tools
-    if: ${{ (inputs.wheel_build == 'true' && (fromJson(inputs.package_json).ubi_version == '' || contains(fromJson(inputs.package_json).ubi_version, 'ubi9')) && fromJson(inputs.package_json).technology_version == '3.14') }}
+    needs: prepare_shared_artifacts
+    if: ${{ (inputs.trigger_all_python_build == 'true' || (inputs.trigger_all_python_builds == 'false' && (fromJson(inputs.package_json).ubi_version == '' || contains(fromJson(inputs.package_json).ubi_version, 'ubi9')) && contains(fromJson(inputs.package_json).technology_version), '3.14')) }}
     runs-on: ubuntu-24.04-s390x
     env:
       PYTHON_VERSION: "3.14"
@@ -558,13 +1034,17 @@ jobs:
       - name: Install system dependencies
         run: sudo apt update -y && sudo apt install -y wget curl tar jq git
 
-      - name: Download PowerCore wheels from COS
-        env:
-          GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
-        run: |
-          chmod +x ./gha-script/v2-script/download-wheels.sh
-          bash ./gha-script/v2-script/download-wheels.sh \
-            "$GHA_CURRENCY_SERVICE_ID_API_KEY"
+       - name: Download powercore-wheels artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: powercore-wheels
+          path: powercore-wheels/
+
+      - name: Download powercore-config artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: powercore-config
+          path: .
 
       - name: Install IBM Cloud CLI
         run: |
@@ -720,6 +1200,7 @@ jobs:
       - name: Archive and upload V2 scan results to COS
         env:
           GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
+          GHA_RUN_ID: ${{ github.run_id }}
         run: |
           ARTIFACT_NAME="${PACKAGE_NAME}-${PACKAGE_VERSION}-v2-scan-result-${{ env.UBI_VERSION }}-${{ env.PYTHON_VERSION }}"
           tar -czf "${ARTIFACT_NAME}.tar.gz" v2-scan-workspace
@@ -739,12 +1220,16 @@ jobs:
   # ---------------------------------------------------------------------------
   v2_license_extraction:
     needs:
+      - wheel_build_ubi9_py310
+      - wheel_build_ubi9_py311
       - wheel_build_ubi9_py312
       - wheel_build_ubi9_py313
       - wheel_build_ubi9_py314
     if: |
       always() &&
-      (needs.wheel_build_ubi9_py312.result == 'success' ||
+      (needs.wheel_build_ubi9_py310.result == 'success' ||
+       needs.wheel_build_ubi9_py311.result == 'success' ||
+       needs.wheel_build_ubi9_py312.result == 'success' ||
        needs.wheel_build_ubi9_py313.result == 'success' ||
        needs.wheel_build_ubi9_py314.result == 'success' )
     runs-on: ubuntu-24.04-s390x
@@ -760,7 +1245,8 @@ jobs:
           bash ./gha-script/v2-script/collect_scan_results.sh \
             "${{ fromJson(inputs.package_json).package_name }}" \
             "${{ fromJson(inputs.package_json).package_version }}" \
-            "$GITHUB_WORKSPACE/v2-scan-workspace"
+            "$GITHUB_WORKSPACE/v2-scan-workspace" \
+            "${{ github.run_id }}"
 
       - name: Extract wheel licenses
         run: |
@@ -771,11 +1257,15 @@ jobs:
 
       - name: Write per-job build statuses for downstream summary
         env:
+          STATUS_UBI9_PY310: ${{ needs.wheel_build_ubi9_py312.result }}
+          STATUS_UBI9_PY311: ${{ needs.wheel_build_ubi9_py312.result }}
           STATUS_UBI9_PY312: ${{ needs.wheel_build_ubi9_py312.result }}
           STATUS_UBI9_PY313: ${{ needs.wheel_build_ubi9_py313.result }}
           STATUS_UBI9_PY314: ${{ needs.wheel_build_ubi9_py314.result }}
         run: |
           printf '%s\n' \
+            "STATUS_UBI9_PY312=${STATUS_UBI9_PY310}" \
+            "STATUS_UBI9_PY312=${STATUS_UBI9_PY311}" \
             "STATUS_UBI9_PY312=${STATUS_UBI9_PY312}" \
             "STATUS_UBI9_PY313=${STATUS_UBI9_PY313}" \
             "STATUS_UBI9_PY314=${STATUS_UBI9_PY314}" \
@@ -790,6 +1280,7 @@ jobs:
       - name: Archive and upload license results to COS
         env:
           GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
+          GHA_RUN_ID: ${{ github.run_id }}
           PACKAGE_NAME: ${{ fromJson(inputs.package_json).package_name }}
           PACKAGE_VERSION: ${{ fromJson(inputs.package_json).package_version }}
         run: |
@@ -826,6 +1317,7 @@ jobs:
             "$PACKAGE_NAME" \
             "$PACKAGE_VERSION" \
             "$GITHUB_WORKSPACE/v2-scan-workspace"
+            "${{ github.run_id }}"
 
       - name: Download and extract license results from COS
         env:
@@ -855,6 +1347,7 @@ jobs:
       - name: Archive and upload final V2 summary to COS
         env:
           GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
+          GHA_RUN_ID: ${{ github.run_id }}
           PACKAGE_NAME: ${{ fromJson(inputs.package_json).package_name }}
           PACKAGE_VERSION: ${{ fromJson(inputs.package_json).package_version }}
         run: |
