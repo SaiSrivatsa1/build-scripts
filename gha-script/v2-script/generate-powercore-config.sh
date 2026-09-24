@@ -81,7 +81,7 @@ echo "OK: IAM access token obtained"
 # ── Step 2: Fetch secret ──────────────────────────────────────────────────────
 echo "=== 2. Fetching secret from Secrets Manager ==="
 SM_API_URL="https://${SM_INSTANCE_ID}.${SM_REGION}.secrets-manager.appdomain.cloud/api/v2/secrets/${SM_SECRET_ID}"
-echo "  Secret ID : ${SM_SECRET_ID} (powercore-config-secrets-staging)"
+echo "  Secret ID : ${SM_SECRET_ID} (powercore-config-gha-env)"
 echo "  Instance  : ${SM_INSTANCE_ID} (${SM_REGION})"
 
 secret_response=$(curl -sS -X GET "${SM_API_URL}" \
