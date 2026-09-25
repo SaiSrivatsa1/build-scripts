@@ -1345,7 +1345,7 @@ jobs:
           bash ./gha-script/v2-script/collect_scan_results.sh \
             "$PACKAGE_NAME" \
             "$PACKAGE_VERSION" \
-            "$GITHUB_WORKSPACE/v2-scan-workspace"
+            "$GITHUB_WORKSPACE/v2-scan-workspace" \
             "${{ github.run_id }}"
 
       - name: Download and extract license results from COS
