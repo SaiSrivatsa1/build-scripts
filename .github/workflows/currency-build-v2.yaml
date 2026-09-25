@@ -1307,7 +1307,7 @@ jobs:
       - wheel_build_ubi9_py313
       - wheel_build_ubi9_py314
     if: always()
-    runs-on: ${{ inputs.large-runner-label != '' && inputs.large-runner-label || 'ubuntu-24.04-ppc64le' }}
+    runs-on: ubuntu-24.04-s390x
     steps:
       - name: Delete shared GHA artifacts
         uses: geekyeggo/delete-artifact@v5
