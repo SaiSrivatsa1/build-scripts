@@ -1294,6 +1294,29 @@ jobs:
           tar -czf "${ARTIFACT_NAME}.tar.gz" v2-scan-workspace/wheel
           chmod +x ./gha-script/v2-script/upload_to_cos.sh
           bash ./gha-script/v2-script/upload_to_cos.sh "${ARTIFACT_NAME}.tar.gz"
+  
+  # ---------------------------------------------------------------------------
+  # cleanup_artifacts: Always runs after all wheel-build jobs (including when
+  # all are skipped) to delete the shared artifacts from GHA storage.
+  # ---------------------------------------------------------------------------
+  cleanup_artifacts:
+    needs:
+      - wheel_build_ubi9_py310
+      - wheel_build_ubi9_py311
+      - wheel_build_ubi9_py312
+      - wheel_build_ubi9_py313
+      - wheel_build_ubi9_py314
+    if: always()
+    runs-on: ${{ inputs.large-runner-label != '' && inputs.large-runner-label || 'ubuntu-24.04-ppc64le' }}
+    steps:
+      - name: Delete shared GHA artifacts
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: |
+            powercore-wheels
+            powercore-config
+            scan-tools
+            build-info
 
   # ---------------------------------------------------------------------------
   # v2_final_summary: Re-collects scan + license results from COS, generates
@@ -1362,11 +1385,8 @@ jobs:
           chmod +x ./gha-script/v2-script/upload_to_cos.sh
           bash ./gha-script/v2-script/upload_to_cos.sh "${ARTIFACT_NAME}.tar.gz"
 
-      - name: Delete GHA artifacts
+      - name: Delete build-status artifact
         if: always()
         uses: geekyeggo/delete-artifact@v5
         with:
-          name: |
-            build-info
-            scan-tools
-            build-status
+          name: build-status
