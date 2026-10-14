@@ -7,7 +7,6 @@
 #       --api-key   <IAM_API_KEY> \
 #       --version   <POWERCORE_WHEEL_VERSION> \
 #       --gh-token  <GITHUB_TOKEN> \
-#       --image-tag  <ICR_IMAGE_TAG> \
 #       --couchdb-api-key <COUCHDB_IAM_API_KEY>
 #
 # Environment variable equivalents:
@@ -38,7 +37,6 @@ while [[ $# -gt 0 ]]; do
     --api-key)    API_KEY="$2";                  shift 2 ;;
     --version)    POWERCORE_VERSION_INPUT="$2";  shift 2 ;;
     --gh-token)   GITHUB_TOKEN_INPUT="$2";       shift 2 ;;
-    --image-tag)  ICR_IMAGE_TAG_INPUT="$2";      shift 2 ;;
     --couchdb-api-key) COUCHDB_API_KEY_INPUT="$2";    shift 2 ;;
     -h|--help)
       echo "Usage: $0 --api-key <KEY> --version <VERSION> --gh-token <TOKEN> [--image-tag <TAG>] [--couchdb-api-key <KEY>]"
@@ -127,8 +125,7 @@ if not kv_data or not isinstance(kv_data, dict):
     sys.exit(1)
 
 api_key_input       = sys.argv[3] if len(sys.argv) > 3 else ''
-image_tag_input     = sys.argv[4] if len(sys.argv) > 4 else ''
-couchdb_iam_api_key = sys.argv[5] if len(sys.argv) > 5 else ''
+couchdb_iam_api_key = sys.argv[4] if len(sys.argv) > 4 else ''
 
 # Inject / override version and token
 kv_data['POWERCORE_WHEEL_VERSION'] = version_input
