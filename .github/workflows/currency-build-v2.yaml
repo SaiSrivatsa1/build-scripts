@@ -125,7 +125,6 @@ jobs:
             --api-key  "$GHA_CURRENCY_SERVICE_ID_API_KEY" \
             --version  "${{ inputs.powercore_version }}" \
             --gh-token "${{ secrets.GH_TOKEN }}" \
-            --image-tag "${{ secrets.ICR_IMAGE_TAG }}" \
             --couchdb-api-key "${{ secrets.COUCHDB_IAM_API_KEY }}"
 
       - name: Upload scan-tools artifact
