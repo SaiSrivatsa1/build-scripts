@@ -39,7 +39,7 @@ while [[ $# -gt 0 ]]; do
     --gh-token)   GITHUB_TOKEN_INPUT="$2";       shift 2 ;;
     --couchdb-api-key) COUCHDB_API_KEY_INPUT="$2";    shift 2 ;;
     -h|--help)
-      echo "Usage: $0 --api-key <KEY> --version <VERSION> --gh-token <TOKEN> [--image-tag <TAG>] [--couchdb-api-key <KEY>]"
+      echo "Usage: $0 --api-key <KEY> --version <VERSION> --gh-token <TOKEN> [--couchdb-api-key <KEY>]"
       exit 0
       ;;
     *)
