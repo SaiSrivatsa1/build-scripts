@@ -26,7 +26,6 @@ set -euo pipefail
 PACKAGE_NAME="${1:?package_name required}"
 PACKAGE_VERSION="${2:?package_version required}"
 WORKSPACE_DIR="${3:-v2-scan-workspace}"
-RUN_ID="${4:?run_id required}"
 
 : "${GHA_CURRENCY_SERVICE_ID_API_KEY:?GHA_CURRENCY_SERVICE_ID_API_KEY is required}"
 
@@ -64,7 +63,7 @@ found_any=false
 for UBI_VER in ubi9; do
   for PY_VER in 3.10 3.11 3.12 3.13 3.14; do
     TARBALL="${PACKAGE_NAME}-${PACKAGE_VERSION}-v2-scan-result-${UBI_VER}-${PY_VER}.tar.gz"
-    OBJECT_KEY="${PACKAGE_NAME}/${PACKAGE_VERSION}/${RUN_ID}/${TARBALL}"
+    OBJECT_KEY="${PACKAGE_NAME}/${PACKAGE_VERSION}/${TARBALL}"
 
     echo ""
     echo "------------------------------------------------------------"
