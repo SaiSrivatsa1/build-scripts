@@ -58,7 +58,7 @@ if [[ -z "${TOKEN}" ]]; then
 fi
 echo "OK: IAM token obtained"
 
-BUCKET_URL="https://s3.us-east.cloud-object-storage.appdomain.cloud/ose-s390x-toolci-bucket-dev"
+BUCKET_URL="https://s3.us-south.cloud-object-storage.appdomain.cloud/ose-s390x-toolci-bucket-dev"
 found_any=false
 
 for UBI_VER in ubi9; do
