@@ -37,7 +37,7 @@ echo "  V2 Scan Results — Downloading & Collecting Artifacts"
 echo "  Package  : ${PACKAGE_NAME}"
 echo "  Version  : ${PACKAGE_VERSION}"
 echo "  Workspace: ${WORKSPACE_DIR}"
-echo "  Bucket   : powercore-gha-builds"
+echo "  Bucket   : ose-s390x-toolci-bucket-dev"
 echo "============================================================"
 
 # Obtain IAM token once and reuse across all downloads
@@ -58,7 +58,7 @@ if [[ -z "${TOKEN}" ]]; then
 fi
 echo "OK: IAM token obtained"
 
-BUCKET_URL="https://s3.us-east.cloud-object-storage.appdomain.cloud/powercore-gha-builds"
+BUCKET_URL="https://s3.us-east.cloud-object-storage.appdomain.cloud/ose-s390x-toolci-bucket-dev"
 found_any=false
 
 for UBI_VER in ubi9; do

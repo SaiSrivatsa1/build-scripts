@@ -25,7 +25,7 @@ OPTIONAL="${2:-}"
 : "${PACKAGE_NAME:?PACKAGE_NAME is required}"
 : "${PACKAGE_VERSION:?PACKAGE_VERSION is required}"
 
-BUCKET="powercore-gha-builds"
+BUCKET="ose-s390x-toolci-bucket-dev"
 BUCKET_URL="https://s3.us-east.cloud-object-storage.appdomain.cloud/${BUCKET}"
 if [[ -n "${GHA_RUN_ID:-}" ]]; then
   OBJECT_KEY="${PACKAGE_NAME}/${PACKAGE_VERSION}/${GHA_RUN_ID}/${FILE}"
