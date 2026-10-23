@@ -24,7 +24,7 @@ FILE="${1:?file argument required}"
 : "${GHA_RUN_ID:?GHA_RUN_ID is required}"
 
 BUCKET="ose-s390x-toolci-bucket-dev"
-BUCKET_URL="https://s3.us-east.cloud-object-storage.appdomain.cloud/${BUCKET}"
+BUCKET_URL="https://s3.us-south.cloud-object-storage.appdomain.cloud/${BUCKET}"
 OBJECT_KEY="${PACKAGE_NAME}/${PACKAGE_VERSION}/${GHA_RUN_ID}/$(basename "${FILE}")"
 
 echo "--- Uploading to COS ---"
