@@ -25,8 +25,8 @@ NO_RUN_ID="${2:-}"
 : "${PACKAGE_NAME:?PACKAGE_NAME is required}"
 : "${PACKAGE_VERSION:?PACKAGE_VERSION is required}"
 
-BUCKET="powercore-gha-builds"
-BUCKET_URL="https://s3.us-east.cloud-object-storage.appdomain.cloud/${BUCKET}"
+BUCKET="ose-s390x-toolci-bucket-dev"
+BUCKET_URL="https://s3.us-south.cloud-object-storage.appdomain.cloud/${BUCKET}"
 
 if [[ "${NO_RUN_ID}" == "--no-run-id" ]]; then
   OBJECT_KEY="${PACKAGE_NAME}/${PACKAGE_VERSION}/$(basename "${FILE}")"
