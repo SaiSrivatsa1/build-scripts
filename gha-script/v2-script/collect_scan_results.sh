@@ -1,36 +1,33 @@
 #!/usr/bin/env bash
-# collect_scan_results.sh — Download per-UBI-version × per-Python-version scan
-# result tarballs from the powercore-builds COS bucket and extract them into a
-# single merged v2-scan-workspace, with clear log output for each combination.
+# collect_scan_results.sh — Download the canonical source and wheel scan
+# result tarballs from the powercore-builds COS bucket and extract them into
+# a single v2-scan-workspace.
 #
 # Usage:
 #   collect_scan_results.sh <package_name> <package_version> <workspace_dir> <run_id>
 #
+#   <run_id> is accepted for interface compatibility but is no longer used to
+#   build the object path — scan tarballs are stored at the version level:
+#     <bucket>/<package_name>/<package_version>/source_scanner.tar.gz
+#     <bucket>/<package_name>/<package_version>/wheel_scanner.tar.gz
+#
 # Required env vars:
 #   GHA_CURRENCY_SERVICE_ID_API_KEY  — IBM Cloud IAM API key
 #
-# For each UBI × Python version combination it tries to download two tarballs:
-#   <base>-source_scanner.tar.gz  — source/ scan results
-#   <base>-wheel_scanner.tar.gz   — wheel/ scan results
-# where <base> = <package_name>-<package_version>-v2-scan-result-<ubi_ver>-<py_ver>
+# Each tarball contains a single top-level directory (source/ or wheel/) and
+# is extracted directly into <workspace_dir> so the paths merge correctly.
 #
-# Each tarball contains a single top-level directory (source/ or wheel/) and is
-# extracted directly into <workspace_dir> so the paths merge correctly.
-#
-# The <run_id> argument (GitHub Actions run ID) ensures only tarballs uploaded
-# by this specific workflow run are collected, preventing cross-run contamination
-# when the same package/version has been built in multiple runs.
-#
-# A 404 is silently skipped (the corresponding job or scan was skipped).
+# A 404 is silently skipped (the corresponding scan type was not produced).
 # Any other HTTP error is fatal.
 #
-# Exits 1 if neither source nor wheel tarballs were found for any combination.
+# Exits 1 if neither tarball was found.
 set -euo pipefail
 
 PACKAGE_NAME="${1:?package_name required}"
 PACKAGE_VERSION="${2:?package_version required}"
 WORKSPACE_DIR="${3:-v2-scan-workspace}"
-RUN_ID="${4:?run_id required}"
+# RUN_ID kept as positional arg for interface compatibility; no longer used here.
+_RUN_ID="${4:-}"
 
 : "${GHA_CURRENCY_SERVICE_ID_API_KEY:?GHA_CURRENCY_SERVICE_ID_API_KEY is required}"
 
@@ -44,7 +41,7 @@ echo "  Workspace: ${WORKSPACE_DIR}"
 echo "  Bucket   : powercore-gha-builds"
 echo "============================================================"
 
-# Obtain IAM token once and reuse across all downloads
+# Obtain IAM token once and reuse across both downloads
 echo "--- Fetching IAM token ---"
 token_request=$(curl -sS -X POST https://iam.cloud.ibm.com/identity/token \
   -H "content-type: application/x-www-form-urlencoded" \
@@ -66,12 +63,17 @@ BUCKET_URL="https://s3.us-east.cloud-object-storage.appdomain.cloud/powercore-gh
 found_any=false
 
 # Helper: download one tarball from COS and extract it into WORKSPACE_DIR.
+# $1 — bare filename (e.g. source_scanner.tar.gz)
 # Returns 0 on success, 1 on 404 (caller treats as skip), exits on other errors.
 download_and_extract() {
   local tarball="${1}"
-  local object_key="${PACKAGE_NAME}/${PACKAGE_VERSION}/${RUN_ID}/${tarball}"
+  local object_key="${PACKAGE_NAME}/${PACKAGE_VERSION}/${tarball}"
 
-  echo "  Fetching: ${object_key}"
+  echo ""
+  echo "------------------------------------------------------------"
+  echo "  Object : ${object_key}"
+  echo "------------------------------------------------------------"
+
   local http_code
   http_code=$(curl -sS -w "%{http_code}" -o "${tarball}" \
     -H "Authorization: bearer ${TOKEN}" \
@@ -79,15 +81,15 @@ download_and_extract() {
 
   if [[ "${http_code}" == "200" ]]; then
     # Each tarball contains one top-level dir (source/ or wheel/).
-    # Extract with --strip-components=0 directly into WORKSPACE_DIR so the
-    # directory lands at ${WORKSPACE_DIR}/source or ${WORKSPACE_DIR}/wheel.
+    # Extract directly into WORKSPACE_DIR so it lands at
+    # ${WORKSPACE_DIR}/source or ${WORKSPACE_DIR}/wheel.
     tar -xzf "${tarball}" -C "${WORKSPACE_DIR}"
     rm -f "${tarball}"
     echo "  OK — extracted into ${WORKSPACE_DIR}/"
     return 0
   elif [[ "${http_code}" == "404" ]]; then
     rm -f "${tarball}"
-    echo "  SKIPPED — not found in COS (job or scan type may have been skipped)."
+    echo "  SKIPPED — not found in COS (scan type may not have been produced)."
     return 1
   else
     rm -f "${tarball}"
@@ -96,55 +98,41 @@ download_and_extract() {
   fi
 }
 
-for UBI_VER in ubi9; do
-  for PY_VER in 3.10 3.11 3.12 3.13 3.14; do
-    BASE="${PACKAGE_NAME}-${PACKAGE_VERSION}-v2-scan-result-${UBI_VER}-${PY_VER}"
+if download_and_extract "source_scanner.tar.gz"; then
+  found_any=true
+fi
 
-    echo ""
-    echo "------------------------------------------------------------"
-    echo "  ${UBI_VER} / Python ${PY_VER}"
-    echo "------------------------------------------------------------"
+if download_and_extract "wheel_scanner.tar.gz"; then
+  found_any=true
+fi
 
-    combo_found=false
+echo ""
+echo "============================================================"
+echo "  Source scan files:"
+echo "============================================================"
+source_files=$(find "${WORKSPACE_DIR}/source" -maxdepth 1 -type f 2>/dev/null | sort)
+if [ -n "${source_files}" ]; then
+  while IFS= read -r f; do
+    SIZE=$(du -sh "$f" | cut -f1)
+    printf "  %-8s  %s\n" "${SIZE}" "$(basename "$f")"
+  done <<< "${source_files}"
+else
+  echo "  (none)"
+fi
 
-    if download_and_extract "${BASE}-source_scanner.tar.gz"; then
-      combo_found=true
-      found_any=true
-    fi
-
-    if download_and_extract "${BASE}-wheel_scanner.tar.gz"; then
-      combo_found=true
-      found_any=true
-    fi
-
-    if [ "${combo_found}" = "true" ]; then
-      echo ""
-      echo "  Wheel scan files:"
-      PY_TAG="cp${PY_VER/./}"
-      wheel_files=$(find "${WORKSPACE_DIR}/wheel" -maxdepth 1 -name "*${PY_TAG}*" 2>/dev/null | sort)
-      if [ -n "${wheel_files}" ]; then
-        while IFS= read -r f; do
-          SIZE=$(du -sh "$f" | cut -f1)
-          printf "    %-8s  %s\n" "${SIZE}" "$(basename "$f")"
-        done <<< "${wheel_files}"
-      else
-        echo "    (none)"
-      fi
-
-      echo ""
-      echo "  Source scan files:"
-      source_files=$(find "${WORKSPACE_DIR}/source" -maxdepth 1 -type f 2>/dev/null | sort)
-      if [ -n "${source_files}" ]; then
-        while IFS= read -r f; do
-          SIZE=$(du -sh "$f" | cut -f1)
-          printf "    %-8s  %s\n" "${SIZE}" "$(basename "$f")"
-        done <<< "${source_files}"
-      else
-        echo "    (none)"
-      fi
-    fi
-  done
-done
+echo ""
+echo "============================================================"
+echo "  Wheel scan files:"
+echo "============================================================"
+wheel_files=$(find "${WORKSPACE_DIR}/wheel" -maxdepth 1 -type f 2>/dev/null | sort)
+if [ -n "${wheel_files}" ]; then
+  while IFS= read -r f; do
+    SIZE=$(du -sh "$f" | cut -f1)
+    printf "  %-8s  %s\n" "${SIZE}" "$(basename "$f")"
+  done <<< "${wheel_files}"
+else
+  echo "  (none)"
+fi
 
 echo ""
 echo "============================================================"
@@ -164,6 +152,6 @@ echo "============================================================"
 
 if [ "${found_any}" = "false" ]; then
   echo ""
-  echo "ERROR: No scan result tarballs were found in COS. Cannot proceed." >&2
+  echo "ERROR: Neither source_scanner.tar.gz nor wheel_scanner.tar.gz were found in COS. Cannot proceed." >&2
   exit 1
 fi
