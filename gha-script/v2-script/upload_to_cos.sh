@@ -1,31 +1,39 @@
 #!/usr/bin/env bash
-# upload_to_cos.sh — Upload a file to the powercore-builds COS bucket under
-# <PACKAGE_NAME>/<PACKAGE_VERSION>/<GHA_RUN_ID>/<filename>.
+# upload_to_cos.sh — Upload a file to the powercore-builds COS bucket.
 #
 # Usage:
-#   upload_to_cos.sh <file>
+#   upload_to_cos.sh <file> [--no-run-id]
+#
+#   --no-run-id   Upload directly under <PACKAGE_NAME>/<PACKAGE_VERSION>/<filename>
+#                 (no run ID path segment).  Use for canonical, version-level
+#                 objects such as source_scanner.tar.gz and wheel_scanner.tar.gz.
+#
+#   Default (no flag): <PACKAGE_NAME>/<PACKAGE_VERSION>/<GHA_RUN_ID>/<filename>
 #
 # Required env vars:
 #   GHA_CURRENCY_SERVICE_ID_API_KEY  — IBM Cloud IAM API key
 #   PACKAGE_NAME                     — package name (path prefix in bucket)
 #   PACKAGE_VERSION                  — package version (path prefix in bucket)
-#
-#   GHA_RUN_ID                       — GitHub Actions run ID (isolates this run's
-#                                      uploads from other runs of the same package/version)
-# The object key in COS will be:
-# <PACKAGE_NAME>/<PACKAGE_VERSION>/<GHA_RUN_ID>/<basename of file>
+#   GHA_RUN_ID                       — GitHub Actions run ID (required unless
+#                                      --no-run-id is passed)
 set -euo pipefail
 
 FILE="${1:?file argument required}"
+NO_RUN_ID="${2:-}"
 
 : "${GHA_CURRENCY_SERVICE_ID_API_KEY:?GHA_CURRENCY_SERVICE_ID_API_KEY is required}"
 : "${PACKAGE_NAME:?PACKAGE_NAME is required}"
 : "${PACKAGE_VERSION:?PACKAGE_VERSION is required}"
-: "${GHA_RUN_ID:?GHA_RUN_ID is required}"
 
-BUCKET="ose-s390x-toolci-bucket-dev"
-BUCKET_URL="https://s3.us-south.cloud-object-storage.appdomain.cloud/${BUCKET}"
-OBJECT_KEY="${PACKAGE_NAME}/${PACKAGE_VERSION}/${GHA_RUN_ID}/$(basename "${FILE}")"
+BUCKET="powercore-gha-builds"
+BUCKET_URL="https://s3.us-east.cloud-object-storage.appdomain.cloud/${BUCKET}"
+
+if [[ "${NO_RUN_ID}" == "--no-run-id" ]]; then
+  OBJECT_KEY="${PACKAGE_NAME}/${PACKAGE_VERSION}/$(basename "${FILE}")"
+else
+  : "${GHA_RUN_ID:?GHA_RUN_ID is required (or pass --no-run-id)}"
+  OBJECT_KEY="${PACKAGE_NAME}/${PACKAGE_VERSION}/${GHA_RUN_ID}/$(basename "${FILE}")"
+fi
 
 echo "--- Uploading to COS ---"
 echo "  File       : ${FILE}"
