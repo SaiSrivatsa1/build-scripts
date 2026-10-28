@@ -312,19 +312,17 @@ jobs:
       - name: Archive and upload V2 scan results to COS
         env:
           GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
-          GHA_RUN_ID: ${{ github.run_id }}
         run: |
-          BASE="${PACKAGE_NAME}-${PACKAGE_VERSION}-v2-scan-result-${{ env.UBI_VERSION }}-${{ env.PYTHON_VERSION }}"
           chmod +x ./gha-script/v2-script/upload_to_cos.sh
           if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/source" ]; then
-            tar -czf "${BASE}-source_scanner.tar.gz" -C "$GITHUB_WORKSPACE/v2-scan-workspace" source
-            bash ./gha-script/v2-script/upload_to_cos.sh "${BASE}-source_scanner.tar.gz"
+            tar -czf source_scanner.tar.gz -C "$GITHUB_WORKSPACE/v2-scan-workspace" source
+            bash ./gha-script/v2-script/upload_to_cos.sh source_scanner.tar.gz --no-run-id
           else
             echo "source/ not present — skipping source_scanner archive."
           fi
           if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/wheel" ]; then
-            tar -czf "${BASE}-wheel_scanner.tar.gz" -C "$GITHUB_WORKSPACE/v2-scan-workspace" wheel
-            bash ./gha-script/v2-script/upload_to_cos.sh "${BASE}-wheel_scanner.tar.gz"
+            tar -czf wheel_scanner.tar.gz -C "$GITHUB_WORKSPACE/v2-scan-workspace" wheel
+            bash ./gha-script/v2-script/upload_to_cos.sh wheel_scanner.tar.gz --no-run-id
           else
             echo "wheel/ not present — skipping wheel_scanner archive."
           fi
@@ -496,19 +494,17 @@ jobs:
       - name: Archive and upload V2 scan results to COS
         env:
           GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
-          GHA_RUN_ID: ${{ github.run_id }}
         run: |
-          BASE="${PACKAGE_NAME}-${PACKAGE_VERSION}-v2-scan-result-${{ env.UBI_VERSION }}-${{ env.PYTHON_VERSION }}"
           chmod +x ./gha-script/v2-script/upload_to_cos.sh
           if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/source" ]; then
-            tar -czf "${BASE}-source_scanner.tar.gz" -C "$GITHUB_WORKSPACE/v2-scan-workspace" source
-            bash ./gha-script/v2-script/upload_to_cos.sh "${BASE}-source_scanner.tar.gz"
+            tar -czf source_scanner.tar.gz -C "$GITHUB_WORKSPACE/v2-scan-workspace" source
+            bash ./gha-script/v2-script/upload_to_cos.sh source_scanner.tar.gz --no-run-id
           else
             echo "source/ not present — skipping source_scanner archive."
           fi
           if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/wheel" ]; then
-            tar -czf "${BASE}-wheel_scanner.tar.gz" -C "$GITHUB_WORKSPACE/v2-scan-workspace" wheel
-            bash ./gha-script/v2-script/upload_to_cos.sh "${BASE}-wheel_scanner.tar.gz"
+            tar -czf wheel_scanner.tar.gz -C "$GITHUB_WORKSPACE/v2-scan-workspace" wheel
+            bash ./gha-script/v2-script/upload_to_cos.sh wheel_scanner.tar.gz --no-run-id
           else
             echo "wheel/ not present — skipping wheel_scanner archive."
           fi
@@ -681,19 +677,17 @@ jobs:
       - name: Archive and upload V2 scan results to COS
         env:
           GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
-          GHA_RUN_ID: ${{ github.run_id }}
         run: |
-          BASE="${PACKAGE_NAME}-${PACKAGE_VERSION}-v2-scan-result-${{ env.UBI_VERSION }}-${{ env.PYTHON_VERSION }}"
           chmod +x ./gha-script/v2-script/upload_to_cos.sh
           if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/source" ]; then
-            tar -czf "${BASE}-source_scanner.tar.gz" -C "$GITHUB_WORKSPACE/v2-scan-workspace" source
-            bash ./gha-script/v2-script/upload_to_cos.sh "${BASE}-source_scanner.tar.gz"
+            tar -czf source_scanner.tar.gz -C "$GITHUB_WORKSPACE/v2-scan-workspace" source
+            bash ./gha-script/v2-script/upload_to_cos.sh source_scanner.tar.gz --no-run-id
           else
             echo "source/ not present — skipping source_scanner archive."
           fi
           if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/wheel" ]; then
-            tar -czf "${BASE}-wheel_scanner.tar.gz" -C "$GITHUB_WORKSPACE/v2-scan-workspace" wheel
-            bash ./gha-script/v2-script/upload_to_cos.sh "${BASE}-wheel_scanner.tar.gz"
+            tar -czf wheel_scanner.tar.gz -C "$GITHUB_WORKSPACE/v2-scan-workspace" wheel
+            bash ./gha-script/v2-script/upload_to_cos.sh wheel_scanner.tar.gz --no-run-id
           else
             echo "wheel/ not present — skipping wheel_scanner archive."
           fi
@@ -865,19 +859,17 @@ jobs:
       - name: Archive and upload V2 scan results to COS
         env:
           GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
-          GHA_RUN_ID: ${{ github.run_id }}
         run: |
-          BASE="${PACKAGE_NAME}-${PACKAGE_VERSION}-v2-scan-result-${{ env.UBI_VERSION }}-${{ env.PYTHON_VERSION }}"
           chmod +x ./gha-script/v2-script/upload_to_cos.sh
           if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/source" ]; then
-            tar -czf "${BASE}-source_scanner.tar.gz" -C "$GITHUB_WORKSPACE/v2-scan-workspace" source
-            bash ./gha-script/v2-script/upload_to_cos.sh "${BASE}-source_scanner.tar.gz"
+            tar -czf source_scanner.tar.gz -C "$GITHUB_WORKSPACE/v2-scan-workspace" source
+            bash ./gha-script/v2-script/upload_to_cos.sh source_scanner.tar.gz --no-run-id
           else
             echo "source/ not present — skipping source_scanner archive."
           fi
           if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/wheel" ]; then
-            tar -czf "${BASE}-wheel_scanner.tar.gz" -C "$GITHUB_WORKSPACE/v2-scan-workspace" wheel
-            bash ./gha-script/v2-script/upload_to_cos.sh "${BASE}-wheel_scanner.tar.gz"
+            tar -czf wheel_scanner.tar.gz -C "$GITHUB_WORKSPACE/v2-scan-workspace" wheel
+            bash ./gha-script/v2-script/upload_to_cos.sh wheel_scanner.tar.gz --no-run-id
           else
             echo "wheel/ not present — skipping wheel_scanner archive."
           fi
@@ -1049,19 +1041,17 @@ jobs:
       - name: Archive and upload V2 scan results to COS
         env:
           GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
-          GHA_RUN_ID: ${{ github.run_id }}
         run: |
-          BASE="${PACKAGE_NAME}-${PACKAGE_VERSION}-v2-scan-result-${{ env.UBI_VERSION }}-${{ env.PYTHON_VERSION }}"
           chmod +x ./gha-script/v2-script/upload_to_cos.sh
           if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/source" ]; then
-            tar -czf "${BASE}-source_scanner.tar.gz" -C "$GITHUB_WORKSPACE/v2-scan-workspace" source
-            bash ./gha-script/v2-script/upload_to_cos.sh "${BASE}-source_scanner.tar.gz"
+            tar -czf source_scanner.tar.gz -C "$GITHUB_WORKSPACE/v2-scan-workspace" source
+            bash ./gha-script/v2-script/upload_to_cos.sh source_scanner.tar.gz --no-run-id
           else
             echo "source/ not present — skipping source_scanner archive."
           fi
           if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/wheel" ]; then
-            tar -czf "${BASE}-wheel_scanner.tar.gz" -C "$GITHUB_WORKSPACE/v2-scan-workspace" wheel
-            bash ./gha-script/v2-script/upload_to_cos.sh "${BASE}-wheel_scanner.tar.gz"
+            tar -czf wheel_scanner.tar.gz -C "$GITHUB_WORKSPACE/v2-scan-workspace" wheel
+            bash ./gha-script/v2-script/upload_to_cos.sh wheel_scanner.tar.gz --no-run-id
           else
             echo "wheel/ not present — skipping wheel_scanner archive."
           fi
