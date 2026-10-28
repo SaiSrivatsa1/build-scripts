@@ -56,7 +56,7 @@ pre_build() {
     for pyx_file in yarl/*.pyx; do
         if [[ -f "$pyx_file" ]]; then
             log_info "Cythonizing ${pyx_file}..."
-            if ! python -m cython -3 -o "${pyx_file%.pyx}.c" "$pyx_file" -I yarl; then
+            if ! python${PYTHON_VERSION} -m cython -3 -o "${pyx_file%.pyx}.c" "$pyx_file" -I yarl; then
                 log_error "Failed to cythonize ${pyx_file}"
                 return 1
             fi
