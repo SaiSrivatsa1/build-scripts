@@ -40,6 +40,11 @@ on:
         description: 'Unique ID for the build'
         required: false
         default: 'None'
+      icr_image_tag:
+        description: 'ICR image tag to use for the PowerCore container image'
+        required: false
+        default: ''
+        type: string
 
 run-name: >
   ${{ format('Currency Build V2 — {0} {1} (ID: {2})', fromJson(inputs.package_json).package_name, fromJson(inputs.package_json).package_version, inputs.unique_id) }}
@@ -124,8 +129,8 @@ jobs:
           bash ./gha-script/v2-script/generate-powercore-config.sh \
             --api-key  "$GHA_CURRENCY_SERVICE_ID_API_KEY" \
             --version  "${{ inputs.powercore_version }}" \
-            --gh-token "${{ secrets.GH_TOKEN }}" \
-            --couchdb-api-key "${{ secrets.COUCHDB_IAM_API_KEY }}"
+            --cloud-api-key "${{ secrets.CLOUD_API_KEY }}" \
+            --image-tag     "${{ inputs.icr_image_tag }}"
 
       - name: Upload scan-tools artifact
         uses: actions/upload-artifact@v4
@@ -312,20 +317,12 @@ jobs:
       - name: Archive and upload V2 scan results to COS
         env:
           GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
+          GHA_RUN_ID: ${{ github.run_id }}
         run: |
+          ARTIFACT_NAME="${PACKAGE_NAME}-${PACKAGE_VERSION}-v2-scan-result-${{ env.UBI_VERSION }}-${{ env.PYTHON_VERSION }}"
+          tar -czf "${ARTIFACT_NAME}.tar.gz" v2-scan-workspace
           chmod +x ./gha-script/v2-script/upload_to_cos.sh
-          if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/source" ]; then
-            tar -czf source_scanner.tar.gz -C "$GITHUB_WORKSPACE/v2-scan-workspace" source
-            bash ./gha-script/v2-script/upload_to_cos.sh source_scanner.tar.gz --no-run-id
-          else
-            echo "source/ not present — skipping source_scanner archive."
-          fi
-          if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/wheel" ]; then
-            tar -czf wheel_scanner.tar.gz -C "$GITHUB_WORKSPACE/v2-scan-workspace" wheel
-            bash ./gha-script/v2-script/upload_to_cos.sh wheel_scanner.tar.gz --no-run-id
-          else
-            echo "wheel/ not present — skipping wheel_scanner archive."
-          fi
+          bash ./gha-script/v2-script/upload_to_cos.sh "${ARTIFACT_NAME}.tar.gz"
 
       - name: Cleanup — teardown PowerCore and remove downloaded files
         if: always()
@@ -494,20 +491,12 @@ jobs:
       - name: Archive and upload V2 scan results to COS
         env:
           GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
+          GHA_RUN_ID: ${{ github.run_id }}
         run: |
+          ARTIFACT_NAME="${PACKAGE_NAME}-${PACKAGE_VERSION}-v2-scan-result-${{ env.UBI_VERSION }}-${{ env.PYTHON_VERSION }}"
+          tar -czf "${ARTIFACT_NAME}.tar.gz" v2-scan-workspace
           chmod +x ./gha-script/v2-script/upload_to_cos.sh
-          if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/source" ]; then
-            tar -czf source_scanner.tar.gz -C "$GITHUB_WORKSPACE/v2-scan-workspace" source
-            bash ./gha-script/v2-script/upload_to_cos.sh source_scanner.tar.gz --no-run-id
-          else
-            echo "source/ not present — skipping source_scanner archive."
-          fi
-          if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/wheel" ]; then
-            tar -czf wheel_scanner.tar.gz -C "$GITHUB_WORKSPACE/v2-scan-workspace" wheel
-            bash ./gha-script/v2-script/upload_to_cos.sh wheel_scanner.tar.gz --no-run-id
-          else
-            echo "wheel/ not present — skipping wheel_scanner archive."
-          fi
+          bash ./gha-script/v2-script/upload_to_cos.sh "${ARTIFACT_NAME}.tar.gz"
 
       - name: Cleanup — teardown PowerCore and remove downloaded files
         if: always()
@@ -677,20 +666,12 @@ jobs:
       - name: Archive and upload V2 scan results to COS
         env:
           GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
+          GHA_RUN_ID: ${{ github.run_id }}
         run: |
+          ARTIFACT_NAME="${PACKAGE_NAME}-${PACKAGE_VERSION}-v2-scan-result-${{ env.UBI_VERSION }}-${{ env.PYTHON_VERSION }}"
+          tar -czf "${ARTIFACT_NAME}.tar.gz" v2-scan-workspace
           chmod +x ./gha-script/v2-script/upload_to_cos.sh
-          if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/source" ]; then
-            tar -czf source_scanner.tar.gz -C "$GITHUB_WORKSPACE/v2-scan-workspace" source
-            bash ./gha-script/v2-script/upload_to_cos.sh source_scanner.tar.gz --no-run-id
-          else
-            echo "source/ not present — skipping source_scanner archive."
-          fi
-          if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/wheel" ]; then
-            tar -czf wheel_scanner.tar.gz -C "$GITHUB_WORKSPACE/v2-scan-workspace" wheel
-            bash ./gha-script/v2-script/upload_to_cos.sh wheel_scanner.tar.gz --no-run-id
-          else
-            echo "wheel/ not present — skipping wheel_scanner archive."
-          fi
+          bash ./gha-script/v2-script/upload_to_cos.sh "${ARTIFACT_NAME}.tar.gz"
 
       - name: Cleanup — teardown PowerCore and remove downloaded files
         if: always()
@@ -859,20 +840,12 @@ jobs:
       - name: Archive and upload V2 scan results to COS
         env:
           GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
+          GHA_RUN_ID: ${{ github.run_id }}
         run: |
+          ARTIFACT_NAME="${PACKAGE_NAME}-${PACKAGE_VERSION}-v2-scan-result-${{ env.UBI_VERSION }}-${{ env.PYTHON_VERSION }}"
+          tar -czf "${ARTIFACT_NAME}.tar.gz" v2-scan-workspace
           chmod +x ./gha-script/v2-script/upload_to_cos.sh
-          if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/source" ]; then
-            tar -czf source_scanner.tar.gz -C "$GITHUB_WORKSPACE/v2-scan-workspace" source
-            bash ./gha-script/v2-script/upload_to_cos.sh source_scanner.tar.gz --no-run-id
-          else
-            echo "source/ not present — skipping source_scanner archive."
-          fi
-          if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/wheel" ]; then
-            tar -czf wheel_scanner.tar.gz -C "$GITHUB_WORKSPACE/v2-scan-workspace" wheel
-            bash ./gha-script/v2-script/upload_to_cos.sh wheel_scanner.tar.gz --no-run-id
-          else
-            echo "wheel/ not present — skipping wheel_scanner archive."
-          fi
+          bash ./gha-script/v2-script/upload_to_cos.sh "${ARTIFACT_NAME}.tar.gz"
 
       - name: Cleanup — teardown PowerCore and remove downloaded files
         if: always()
@@ -1041,20 +1014,12 @@ jobs:
       - name: Archive and upload V2 scan results to COS
         env:
           GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
+          GHA_RUN_ID: ${{ github.run_id }}
         run: |
+          ARTIFACT_NAME="${PACKAGE_NAME}-${PACKAGE_VERSION}-v2-scan-result-${{ env.UBI_VERSION }}-${{ env.PYTHON_VERSION }}"
+          tar -czf "${ARTIFACT_NAME}.tar.gz" v2-scan-workspace
           chmod +x ./gha-script/v2-script/upload_to_cos.sh
-          if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/source" ]; then
-            tar -czf source_scanner.tar.gz -C "$GITHUB_WORKSPACE/v2-scan-workspace" source
-            bash ./gha-script/v2-script/upload_to_cos.sh source_scanner.tar.gz --no-run-id
-          else
-            echo "source/ not present — skipping source_scanner archive."
-          fi
-          if [ -d "$GITHUB_WORKSPACE/v2-scan-workspace/wheel" ]; then
-            tar -czf wheel_scanner.tar.gz -C "$GITHUB_WORKSPACE/v2-scan-workspace" wheel
-            bash ./gha-script/v2-script/upload_to_cos.sh wheel_scanner.tar.gz --no-run-id
-          else
-            echo "wheel/ not present — skipping wheel_scanner archive."
-          fi
+          bash ./gha-script/v2-script/upload_to_cos.sh "${ARTIFACT_NAME}.tar.gz"
 
       - name: Cleanup — teardown PowerCore and remove downloaded files
         if: always()
