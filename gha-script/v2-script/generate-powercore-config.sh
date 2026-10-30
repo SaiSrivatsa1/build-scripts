@@ -122,9 +122,9 @@ if not kv_data or not isinstance(kv_data, dict):
     sys.stderr.write('ERROR: Could not parse key-value data from Secrets Manager response\n')
     sys.exit(1)
 
-api_key_input      = sys.argv[3] if len(sys.argv) > 3 else ''
-cloud_api_key      = sys.argv[4] if len(sys.argv) > 4 else ''
-image_tag_input    = sys.argv[5] if len(sys.argv) > 5 else ''
+api_key_input      = sys.argv[2] if len(sys.argv) > 2 else ''
+cloud_api_key      = sys.argv[3] if len(sys.argv) > 3 else ''
+image_tag_input    = sys.argv[4] if len(sys.argv) > 4 else ''
 
 # Inject / override version and token
 kv_data['POWERCORE_WHEEL_VERSION'] = version_input
@@ -146,7 +146,7 @@ kv_data['CLOUD_API_KEY'] = cloud_api_key
 with open('powercore-config.env', 'w') as f:
     for k, v in kv_data.items():
         f.write(f'{k}={v}\n')
-" "${POWERCORE_VERSION_INPUT}" "${CLOUD_API_KEY}" <<< "${secret_response}"
+" "${POWERCORE_VERSION_INPUT}" "${API_KEY}" "${CLOUD_API_KEY}" "${ICR_IMAGE_TAG_INPUT}" <<< "${secret_response}"
 
 if [[ ! -f powercore-config.env ]]; then
   echo "ERROR: powercore-config.env was not generated"
