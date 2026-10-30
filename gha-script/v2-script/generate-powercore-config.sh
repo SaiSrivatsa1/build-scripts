@@ -122,11 +122,19 @@ if not kv_data or not isinstance(kv_data, dict):
     sys.stderr.write('ERROR: Could not parse key-value data from Secrets Manager response\n')
     sys.exit(1)
 
+api_key_input      = sys.argv[2] if len(sys.argv) > 2 else ''
 cloud_api_key      = sys.argv[3] if len(sys.argv) > 3 else ''
 image_tag_input    = sys.argv[4] if len(sys.argv) > 3 else ''
 
 # Inject / override version and token
 kv_data['POWERCORE_WHEEL_VERSION'] = version_input
+
+# Map the caller's API key to all downstream service key variables
+if api_key_input:
+    kv_data['COS_API_KEY']        = api_key_input
+    kv_data['ICR_API_KEY']        = api_key_input
+    kv_data['IBMCLOUD_API_KEY']   = api_key_input
+    kv_data['IAM_WRITER_API_KEY'] = api_key_input
 
 # Inject image tag if provided
 if image_tag_input:
