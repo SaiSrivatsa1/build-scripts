@@ -4,15 +4,16 @@
 #
 # Usage:
 #   ./generate-powercore-config.sh \
-#       --api-key   <IAM_API_KEY> \
-#       --version   <POWERCORE_WHEEL_VERSION> \
-#       --gh-token  <GITHUB_TOKEN> \
-#       --couchdb-api-key <COUCHDB_IAM_API_KEY>
+#       --api-key       <IAM_API_KEY> \
+#       --version       <POWERCORE_WHEEL_VERSION> \
+#       --cloud-api-key <CLOUD_API_KEY> \
+#       --image-tag     <ICR_IMAGE_TAG>
 #
 # Environment variable equivalents:
 #   IAM_API_KEY / IBMCLOUD_API_KEY / GHA_CURRENCY_SERVICE_ID_API_KEY
 #   POWERCORE_WHEEL_VERSION / POWERCORE_VERSION
-#   GITHUB_TOKEN / GH_TOKEN
+#   CLOUD_API_KEY
+#   ICR_IMAGE_TAG
 # Outputs:
 #   powercore-config.env   written to the current working directory
 # Tested on UBI9
@@ -57,7 +58,7 @@ if [[ -z "${POWERCORE_VERSION_INPUT}" ]]; then
   exit 1
 fi
 if [[ -z "${CLOUD_API_KEY}" ]]; then
-  echo "ERROR: PowerCore version is required (--cloud-api-key or set CLOUD_API_KEY)"
+  echo "ERROR: Cloud API key is required (--cloud-api-key or set CLOUD_API_KEY)"
   exit 1
 fi
 
@@ -132,7 +133,7 @@ kv_data['POWERCORE_WHEEL_VERSION'] = version_input
 if image_tag_input:
     kv_data['ICR_IMAGE_TAG'] = image_tag_input
 
-#Set CLOUD_API_KEY
+# Set CLOUD_API_KEY
 kv_data['CLOUD_API_KEY'] = cloud_api_key
 
 with open('powercore-config.env', 'w') as f:
