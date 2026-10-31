@@ -122,8 +122,8 @@ if not kv_data or not isinstance(kv_data, dict):
     sys.stderr.write('ERROR: Could not parse key-value data from Secrets Manager response\n')
     sys.exit(1)
 
-cloud_api_key      = sys.argv[3] if len(sys.argv) > 3 else ''
-image_tag_input    = sys.argv[4] if len(sys.argv) > 4 else ''
+cloud_api_key      = sys.argv[2] if len(sys.argv) > 2 else ''
+image_tag_input    = sys.argv[3] if len(sys.argv) > 3 else ''
 
 # Inject / override version and token
 kv_data['POWERCORE_WHEEL_VERSION'] = version_input
