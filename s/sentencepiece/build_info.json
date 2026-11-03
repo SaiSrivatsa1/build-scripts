@@ -6,7 +6,7 @@
   "version": "v0.2.1",
   "wheel_build": true,
   "v2-enabled": true,
-  "resource_class": "light",
+  "resource_class": "heavy",
   "package_dir": "s/sentencepiece",
   "default_branch": "master",
   "build_script": "sentencepiece.sh",
