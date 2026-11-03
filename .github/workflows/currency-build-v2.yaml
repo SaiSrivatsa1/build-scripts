@@ -1071,8 +1071,8 @@ jobs:
 
       - name: Write per-job build statuses for downstream summary
         env:
-          STATUS_UBI9_PY310: ${{ needs.wheel_build_ubi9_py312.result }}
-          STATUS_UBI9_PY311: ${{ needs.wheel_build_ubi9_py312.result }}
+          STATUS_UBI9_PY310: ${{ needs.wheel_build_ubi9_py310.result }}
+          STATUS_UBI9_PY311: ${{ needs.wheel_build_ubi9_py311.result }}
           STATUS_UBI9_PY312: ${{ needs.wheel_build_ubi9_py312.result }}
           STATUS_UBI9_PY313: ${{ needs.wheel_build_ubi9_py313.result }}
           STATUS_UBI9_PY314: ${{ needs.wheel_build_ubi9_py314.result }}
