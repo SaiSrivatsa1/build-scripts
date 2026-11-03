@@ -4,7 +4,9 @@ set -euo pipefail
 RUNTIME="${1:?PowerCore runtime required}"
 PACKAGE_NAME="${2:?package name required}"
 WORKSPACE_DIR="${3:-v2-scan-workspace}"
-POWERCORE_BUILD_SCRIPTS="${POWERCORE_BUILD_SCRIPTS:-/home/powercore/build-scripts-v2}"
+POWERCORE_BUILD_SCRIPTS="${GITHUB_WORKSPACE}"
+
+PACKAGE_NAME=$(echo "$PACKAGE_NAME" | tr '[:upper:]' '[:lower:]' | tr '.' '_')
 
 echo "--- V2 scan workspace inputs ---"
 echo "RUNTIME=${RUNTIME}"
