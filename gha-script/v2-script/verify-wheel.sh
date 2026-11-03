@@ -32,7 +32,7 @@ fi
 echo "Results CSV: $CSV"
 
 # Normalize: hyphens and underscores are interchangeable in package names
-PKG_NORM="${PACKAGE_NAME//-/_}"
+PKG_NORM=$(echo "$PACKAGE_NAME" | tr '[:upper:]' '[:lower:]' | tr '.-' '__')
 STATUS=$(sudo -u powercore awk -F',' -v pkg="$PKG_NORM" '
   NR==1 {
     for (i=1;i<=NF;i++) {
@@ -44,7 +44,7 @@ STATUS=$(sudo -u powercore awk -F',' -v pkg="$PKG_NORM" '
   }
   NF>1 {
     gsub(/\r/,"")
-    n=(ni?$ni:"?"); gsub(/-/,"_",n); gsub(/^ +| +$/,"",n)
+    n=(ni?$ni:"?"); n=tolower(n); gsub(/-/,"_",n); gsub(/^ +| +$/,"",n)
     s=(si?$si:"");  gsub(/^ +| +$/,"",s)
     if (n==pkg && si) { print s; exit }
   }
