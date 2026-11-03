@@ -6,6 +6,8 @@ PACKAGE_NAME="${2:?package name required}"
 WORKSPACE_DIR="${3:-v2-scan-workspace}"
 POWERCORE_BUILD_SCRIPTS="${GITHUB_WORKSPACE}"
 
+PACKAGE_NAME=$(echo "$PACKAGE_NAME" | tr '[:upper:]' '[:lower:]' | tr '.-' '__')
+
 echo "--- V2 scan workspace inputs ---"
 echo "RUNTIME=${RUNTIME}"
 echo "PACKAGE_NAME=${PACKAGE_NAME}"
