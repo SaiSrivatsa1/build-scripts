@@ -12,6 +12,7 @@
   "docker_build": false,
   "validate_build_script": true,
   "use_non_root_user": "false",
+  "resource_class": "heavy",
   "*": {
     "build_script": "editdistance.sh"
   }
