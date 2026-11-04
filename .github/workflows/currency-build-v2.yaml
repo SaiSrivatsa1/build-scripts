@@ -1078,8 +1078,8 @@ jobs:
           STATUS_UBI9_PY314: ${{ needs.wheel_build_ubi9_py314.result }}
         run: |
           printf '%s\n' \
-            "STATUS_UBI9_PY312=${STATUS_UBI9_PY310}" \
-            "STATUS_UBI9_PY312=${STATUS_UBI9_PY311}" \
+            "STATUS_UBI9_PY310=${STATUS_UBI9_PY310}" \
+            "STATUS_UBI9_PY311=${STATUS_UBI9_PY311}" \
             "STATUS_UBI9_PY312=${STATUS_UBI9_PY312}" \
             "STATUS_UBI9_PY313=${STATUS_UBI9_PY313}" \
             "STATUS_UBI9_PY314=${STATUS_UBI9_PY314}" \
