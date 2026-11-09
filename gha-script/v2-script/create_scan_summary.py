@@ -48,6 +48,13 @@ job_statuses = {
     ("ubi9",  "3.14"): os.environ.get("STATUS_UBI9_PY314",  "skipped"),
 }
 
+# Non-Python (language-version independent) builds, if one was run
+non_python_tech = os.environ.get("NON_PYTHON_TECHNOLOGY", "")
+if non_python_tech and non_python_tech != "python":
+    for ubi in "ubi9":
+        status = os.environ.get(f"STATUS_BUILD_PACKAGE_{ubi.upper()}", "skipped")
+        job_statuses[(ubi, non_python_tech)] = status
+
 summary = {
     "package": package_name,
     "version": package_version,

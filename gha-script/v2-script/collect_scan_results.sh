@@ -61,8 +61,20 @@ echo "OK: IAM token obtained"
 BUCKET_URL="https://s3.us-east.cloud-object-storage.appdomain.cloud/powercore-gha-builds"
 found_any=false
 
+# For non-Python packages the scan-result tarball is suffixed with the
+# technology name (e.g. ...-ubi9-java.tar.gz) instead of a Python version.
+NON_PYTHON_TECH=""
+if [[ -n "${TECHNOLOGY:-}" && "${TECHNOLOGY}" != "python" ]]; then
+  NON_PYTHON_TECH="${TECHNOLOGY}"
+fi
+
 for UBI_VER in ubi9; do
-  for PY_VER in 3.10 3.11 3.12 3.13 3.14; do
+  if [[ -n "${NON_PYTHON_TECH}" ]]; then
+    PY_VERS="${NON_PYTHON_TECH}"
+  else
+    PY_VERS="3.10 3.11 3.12 3.13 3.14"
+  fi
+  for PY_VER in ${PY_VERS}; do
     TARBALL="${PACKAGE_NAME}-${PACKAGE_VERSION}-v2-scan-result-${UBI_VER}-${PY_VER}.tar.gz"
     OBJECT_KEY="${PACKAGE_NAME}/${PACKAGE_VERSION}/${RUN_ID}/${TARBALL}"
 
@@ -86,7 +98,12 @@ for UBI_VER in ubi9; do
       echo ""
       echo "  Wheel scan files:"
       PY_TAG="cp${PY_VER/./}"
-      wheel_files=$(find "${WORKSPACE_DIR}/wheel" -maxdepth 1 -name "*${PY_TAG}*" 2>/dev/null | sort)
+      if [[ -n "${NON_PYTHON_TECH}" ]]; then
+        wheel_files=$(find "${WORKSPACE_DIR}/wheel" -maxdepth 1 -type f 2>/dev/null | sort)
+      else
+        PY_TAG="cp${PY_VER/./}"
+        wheel_files=$(find "${WORKSPACE_DIR}/wheel" -maxdepth 1 -name "*${PY_TAG}*" 2>/dev/null | sort)
+      fi
       if [ -n "${wheel_files}" ]; then
         while IFS= read -r f; do
           SIZE=$(du -sh "$f" | cut -f1)
