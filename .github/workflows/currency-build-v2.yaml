@@ -1237,6 +1237,7 @@ jobs:
       - name: Collect scan results from COS
         env:
           GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
+          TECHNOLOGY: ${{ fromJson(inputs.package_json).technology }}
         run: |
           chmod +x ./gha-script/v2-script/collect_scan_results.sh
           bash ./gha-script/v2-script/collect_scan_results.sh \
@@ -1336,6 +1337,7 @@ jobs:
           GHA_CURRENCY_SERVICE_ID_API_KEY: ${{ secrets.GHA_CURRENCY_SERVICE_ID_API_KEY }}
           PACKAGE_NAME: ${{ fromJson(inputs.package_json).package_name }}
           PACKAGE_VERSION: ${{ fromJson(inputs.package_json).package_version }}
+          TECHNOLOGY: ${{ fromJson(inputs.package_json).technology }}
         run: |
           chmod +x ./gha-script/v2-script/collect_scan_results.sh
           bash ./gha-script/v2-script/collect_scan_results.sh \
