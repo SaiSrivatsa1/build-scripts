@@ -1260,6 +1260,7 @@ jobs:
           STATUS_UBI9_PY313: ${{ needs.wheel_build_ubi9_py313.result }}
           STATUS_UBI9_PY314: ${{ needs.wheel_build_ubi9_py314.result }}
           STATUS_BUILD_PACKAGE_UBI9: ${{ needs.build_package_ubi9.result }}
+          NON_PYTHON_TECHNOLOGY: ${{ fromJson(inputs.package_json).technology }}
         run: |
           printf '%s\n' \
             "STATUS_UBI9_PY312=${STATUS_UBI9_PY310}" \
