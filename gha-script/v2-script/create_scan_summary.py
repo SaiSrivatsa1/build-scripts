@@ -52,7 +52,7 @@ job_statuses = {
 non_python_tech = os.environ.get("NON_PYTHON_TECHNOLOGY", "")
 if non_python_tech and non_python_tech != "python":
     status = os.environ.get(f"STATUS_BUILD_PACKAGE_UBI9", "skipped")
-    job_statuses[(ubi, non_python_tech)] = status
+    job_statuses[(ubi9, non_python_tech)] = status
 
 summary = {
     "package": package_name,
