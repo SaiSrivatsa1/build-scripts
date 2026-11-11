@@ -12,9 +12,9 @@
   **"Pass | Both\_Install\_and\_Test\_Success"**
 * If the build script fails and you identify a fix required in the `<package-name>.sh` script to achieve successful execution, follow these steps:
 
-  * Fork the [build-scripts repo](https://github.com/linux-on-ibm-z/build-scripts)
+  * Fork the [build-scripts repo](https://github.com/s390x/build-scripts)
   * Create a new branch for your changes, starting from the version proposed in this PR
-  * Follow all the points mentioned in [CONTRIBUTING.MD](https://github.com/linux-on-ibm-z/build-scripts/blob/master/CONTRIBUTING.md) before raising the PR
+  * Follow all the points mentioned in [CONTRIBUTING.MD](https://github.com/s390x/build-scripts/blob/master/CONTRIBUTING.md) before raising the PR
   * Open a new PR from your fork with the fix
   * Close this auto-generated PR and include a link to your updated PR in the closure comment
 
