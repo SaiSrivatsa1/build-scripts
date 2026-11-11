@@ -42,7 +42,7 @@ UBI_VER="${UBI_VER:-ubi9}"
 
 # Derive package directory and image name (used by build_docker and upload_docker_image)
 PKG_NAME_LOWER=$(echo "$PKG_NAME" | tr '[:upper:]' '[:lower:]')
-IMAGE_NAME="icr.io/ppc64le-oss/${PKG_NAME_LOWER}-ppc64le:${PKG_VER}"
+IMAGE_NAME="icr.io/ppc64le-oss/${PKG_NAME_LOWER}-s390x:${PKG_VER}"
 INITIAL_CHAR=${PKG_NAME_LOWER:0:1}
 PKG_DIR_PATH="${INITIAL_CHAR}/${PKG_NAME_LOWER}/"
 if [ ! -d "$PKG_DIR_PATH" ] && [ -d "${INITIAL_CHAR}/${PKG_NAME}/" ]; then

@@ -97,7 +97,6 @@ for UBI_VER in ubi9; do
 
       echo ""
       echo "  Wheel scan files:"
-      PY_TAG="cp${PY_VER/./}"
       if [[ -n "${NON_PYTHON_TECH}" ]]; then
         wheel_files=$(find "${WORKSPACE_DIR}/wheel" -maxdepth 1 -type f 2>/dev/null | sort)
       else
