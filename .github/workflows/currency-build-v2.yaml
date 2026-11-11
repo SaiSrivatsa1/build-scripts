@@ -1212,7 +1212,7 @@ jobs:
   # build_docker: Builds and uploads the package docker image to ICR.
   # ---------------------------------------------------------------------------
   build_docker:
-    needs: build_info
+    needs: [build_info, prepare_shared_artifacts]
     if: ${{ inputs.build_docker == 'true' }}
     runs-on: ubuntu-24.04-s390x
     steps:
