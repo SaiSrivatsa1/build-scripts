@@ -158,7 +158,7 @@ jobs:
   # ---------------------------------------------------------------------------
   wheel_build_ubi9_py310:
     needs: prepare_shared_artifacts
-    if: ${{ inputs.trigger_all_python_builds == 'true' || (inputs.trigger_all_python_builds == 'false' && (fromJson(inputs.package_json).ubi_version == '' || contains(fromJson(inputs.package_json).ubi_version, 'ubi9')) && contains(fromJson(inputs.package_json).technology_version, '3.10')) }}
+    if: ${{ inputs.trigger_all_python_builds == 'true' && (inputs.trigger_all_python_builds == 'false' && (fromJson(inputs.package_json).ubi_version == '' || contains(fromJson(inputs.package_json).ubi_version, 'ubi9')) && contains(fromJson(inputs.package_json).technology_version, '3.10')) }}
     runs-on: ubuntu-24.04-s390x
     env:
       PYTHON_VERSION: "3.10"
