@@ -9,9 +9,13 @@
   "package_dir": "b/bcrypt",
   "default_branch": "main",
   "build_script": "bcrypt.sh",
-  "docker_build": false,
+  "docker_build": true,
   "validate_build_script": true,
   "use_non_root_user": "false",
+  "5.*.*": {
+    "dir": "5.0.0",
+    "build_script": "bcrypt.sh"
+  },
   "*": {
     "build_script": "bcrypt.sh"
   }
