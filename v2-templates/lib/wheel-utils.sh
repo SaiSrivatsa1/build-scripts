@@ -159,10 +159,10 @@ for item in excludes:
 
 # get_auditwheel_plat: Map OS/UBI major version to PEP 600 manylinux platform tag
 # Reads from:
-#   1. AUDITWHEEL_PLAT environment variable override (e.g. manylinux_2_34_ppc64le)
+#   1. AUDITWHEEL_PLAT environment variable override (e.g. manylinux_2_34_s390x)
 #   2. UBI_MAJOR environment variable
 #   3. /etc/os-release (VERSION_ID)
-# Returns: "manylinux_2_28_ppc64le", "manylinux_2_34_ppc64le", "manylinux_2_39_ppc64le", etc.
+# Returns: "manylinux_2_28_s390x", "manylinux_2_34_s390x", "manylinux_2_39_s390x", etc.
 get_auditwheel_plat() {
     if [[ -n "${AUDITWHEEL_PLAT:-}" ]]; then
         echo "${AUDITWHEEL_PLAT}"
@@ -180,13 +180,13 @@ get_auditwheel_plat() {
 
     case "$ubi_major" in
         8)
-            echo "manylinux_2_28_ppc64le"
+            echo "manylinux_2_28_s390x"
             ;;
         9)
-            echo "manylinux_2_34_ppc64le"
+            echo "manylinux_2_34_s390x"
             ;;
         10)
-            echo "manylinux_2_39_ppc64le"
+            echo "manylinux_2_39_s390x"
             ;;
         *)
             log_error "Unsupported UBI major version for auditwheel platform mapping: ${ubi_major:-unknown}"
@@ -203,7 +203,7 @@ get_auditwheel_plat() {
 # Performs in a single extract-and-repack cycle:
 #   1. Extract wheel (1 wheel unpack)
 #   2. Bundled library license resolution & license file injection
-#   3. PPC64LE rebuild suffix resolution (+ppc64leN PEP 440 local version)
+#   3. s390x rebuild suffix resolution (+s390xN PEP 440 local version)
 #   4. Classifier injection & custom_wheel_metadata hook
 #   5. CycloneDX SBOM & CVE report generation
 #   6. Repack wheel (1 wheel pack - automatically recalculates PEP 376/427 RECORD)
@@ -282,7 +282,7 @@ postprocess_wheel_single_pass() {
         fi
     fi
 
-    # 3. PPC64LE Rebuild Suffix Retagging (PEP 440 Local Version Identifier +ppc64leN)
+    # 3. s390x Rebuild Suffix Retagging (PEP 440 Local Version Identifier +s390xN)
     local final_wheel_name="$wheel_name"
     local retag_output
     if ! retag_output=$(python3 "${_WHEEL_UTILS_DIR}/wheel-postprocess.py" "$wheel_name" "$pkg_dir" "" "$wheel_path_abs"); then

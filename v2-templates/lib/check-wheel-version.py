@@ -65,7 +65,7 @@ except ImportError:
 
 # Detects a git-hash local segment (6+ hex chars, optional leading 'g').
 # Matches:   g1892993bc  56be3b5e  g6909efdd6
-# No match:  cpu  cuda118  rocm6  cpu.ppc64le  ubi9  ppc64le1
+# No match:  cpu  cuda118  rocm6  cpu.s390x  ubi9  s390x1
 _GIT_HASH_RE = re.compile(r"(?:^|\.)g?[0-9a-f]{6,}(?:\.|$)", re.IGNORECASE)
 
 # Strips operator separators — e.g. pkg==1.2.3  pkg@1.2.3

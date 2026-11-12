@@ -6,7 +6,7 @@ This script is invoked by wheel-utils.sh during wheel postprocessing.
 It handles:
 1. Parsing wheel filename and extracting package, version, python tag, abi tag.
 2. Checking IBM Cloud Object Storage (COS) for existing builds of the same package/version.
-3. Resolving PEP 440 local version identifiers (+ubi9, +ubi10, +ppc64leN).
+3. Resolving PEP 440 local version identifiers (+ubi9, +ubi10, +s390xN).
 4. Updating the METADATA Version field.
 5. Renaming the .dist-info directory inside the extracted wheel temp directory.
 
@@ -355,12 +355,12 @@ def resolve_suffix(pkg, ver, py_tag, abi_tag, remainder, distro_tag, wheel_path)
     if wheel_suffix:
         return wheel_suffix
 
-    # 2. Determine base architecture prefix: BASE_SUFFIX > POWERCORE_ARCH > ARCHITECTURE > "ppc64le"
+    # 2. Determine base architecture prefix: BASE_SUFFIX > POWERCORE_ARCH > ARCHITECTURE > "s390x"
     base_suffix = (
         os.environ.get("BASE_SUFFIX")
         or os.environ.get("POWERCORE_ARCH")
         or os.environ.get("ARCHITECTURE")
-        or "ppc64le"
+        or "s390x"
     )
 
     # 3. Automated IBM COS lookup
@@ -427,8 +427,8 @@ def resolve_suffix(pkg, ver, py_tag, abi_tag, remainder, distro_tag, wheel_path)
             target_wheel_name = os.path.basename(wheel_path) if wheel_path else f"{pkg}-{ver}-{remainder}.whl"
 
             # Match whole wheel filename for this specific package and base version:
-            # 1. Exact clean wheel: e.g. 're2-2024.7.2-py3-none-manylinux_2_34_ppc64le.whl'
-            # 2. Existing rebuild variants: e.g. 're2-2024.7.2+ppc64le1-py3-none-manylinux_2_34_ppc64le.whl'
+            # 1. Exact clean wheel: e.g. 're2-2024.7.2-py3-none-manylinux_2_34_s390x.whl'
+            # 2. Existing rebuild variants: e.g. 're2-2024.7.2+s390x1-py3-none-manylinux_2_34_s390x.whl'
             base_ver = ver.split("+")[0]
             dist_pattern = rf"(?:{re.escape(pkg)}|{re.escape(pkg.replace('_', '-'))})"
             wheel_regex = re.compile(
@@ -487,7 +487,7 @@ def resolve_suffix(pkg, ver, py_tag, abi_tag, remainder, distro_tag, wheel_path)
     return None
 
 
-resolve_ppc64le_suffix = resolve_suffix
+resolve_s390x_suffix = resolve_suffix
 
 
 def main():
