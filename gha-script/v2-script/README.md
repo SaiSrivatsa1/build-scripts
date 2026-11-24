@@ -96,7 +96,7 @@ export POWERCORE_ENVIRONMENT="local"   # or "staging"
 Supported variable aliases:
 | Variable | Aliases |
 | :--- | :--- |
-| API Key | `IAM_API_KEY`, `IBMCLOUD_API_KEY`, `GHA_CURRENCY_SERVICE_ID_API_KEY` |
+| API Key | `IAM_API_KEY`, `IBMCLOUD_API_KEY`, `GHA_CURRENCY_SERVICE_ID_API_KEY_V2` |
 | Version | `POWERCORE_VERSION`, `POWERCORE_WHEEL_VERSION` |
 | GitHub Token | `GITHUB_TOKEN`, `GH_TOKEN` |
 | Environment | `POWERCORE_ENVIRONMENT` |
