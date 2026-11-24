@@ -1240,8 +1240,8 @@ jobs:
           set -a
           source variable.sh
           set +a
-          chmod +x ./gha-script/upload-scripts/upload_docker_image.sh
-          bash ./gha-script/upload-scripts/upload_docker_image.sh
+          chmod +x ./gha-script/v2-script/upload-scripts/upload_docker_image.sh
+          bash ./gha-script/v2-script/upload-scripts/upload_docker_image.sh
 
       - name: Upload Docker image artifact
         uses: actions/upload-artifact@v4
